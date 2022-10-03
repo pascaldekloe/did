@@ -2,6 +2,7 @@
 package did
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -56,4 +57,20 @@ func Parse(s string) (*Attrs, error) {
 	}
 
 	return &attrs, nil
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (attrs *Attrs) UnmarshalJSON(bytes []byte) error {
+	var s string
+	err := json.Unmarshal(bytes, &s)
+	if err != nil {
+		return err
+	}
+
+	p, err := Parse(s)
+	if err != nil {
+		return fmt.Errorf("JSON string content: %w", err)
+	}
+	*attrs = *p // copy
+	return nil
 }
