@@ -59,6 +59,21 @@ func Parse(s string) (*Attrs, error) {
 	return &attrs, nil
 }
 
+// URL returns a mapping to the standard Go domain.
+func (attrs *Attrs) URL() *url.URL {
+	return &url.URL{
+		Scheme:   "did",
+		Opaque:   attrs.Method + ":" + attrs.SpecID + attrs.Path,
+		RawQuery: attrs.Params.Encode(),
+		Fragment: attrs.Fragment,
+	}
+}
+
+// String returns the DID URI.
+func (attrs *Attrs) String() string {
+	return attrs.URL().String()
+}
+
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (attrs *Attrs) UnmarshalJSON(bytes []byte) error {
 	var s string

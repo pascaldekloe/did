@@ -15,10 +15,9 @@ func TestDocSubjectJSON(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if doc.Subject.Method != "example" {
-		t.Errorf("got subject method %q, want example", doc.Subject.Method)
-	}
-	if doc.Subject.SpecID != "123456789abcdefghijk" {
-		t.Errorf("got method-specific identifier %q, want 123456789abcdefghijk", doc.Subject.SpecID)
+
+	const want = "did:example:123456789abcdefghijk"
+	if got := doc.Subject.String(); got != want {
+		t.Errorf("got subject %q, want %q", got, want)
 	}
 }
