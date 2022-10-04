@@ -6,34 +6,46 @@ import (
 	"testing"
 )
 
-var GoldenAttrsPerDID = map[string]Attrs{
+var GoldenURLs = map[string]URL{
 	"did:example:123456789abcdefghi": {
-		Method: "example",
-		SpecID: "123456789abcdefghi",
+		DID: DID{
+			Method: "example",
+			SpecID: "123456789abcdefghi",
+		},
 	},
 	"did:example:123456/path": {
-		Method: "example",
-		SpecID: "123456",
-		Path:   "/path",
+		DID: DID{
+			Method: "example",
+			SpecID: "123456",
+		},
+		Path: "/path",
 	},
 	"did:example:123456?versionId=1": {
-		Method: "example",
-		SpecID: "123456",
+		DID: DID{
+			Method: "example",
+			SpecID: "123456",
+		},
 		Params: url.Values{"versionId": []string{"1"}},
 	},
 	"did:example:123#public-key-0": {
-		Method:   "example",
-		SpecID:   "123",
+		DID: DID{
+			Method: "example",
+			SpecID: "123",
+		},
 		Fragment: "public-key-0",
 	},
 	"did:example:123#agent": {
-		Method:   "example",
-		SpecID:   "123",
+		DID: DID{
+			Method: "example",
+			SpecID: "123",
+		},
 		Fragment: "agent",
 	},
 	"did:example:123?service=agent&relativeRef=/credentials#degree": {
-		Method: "example",
-		SpecID: "123",
+		DID: DID{
+			Method: "example",
+			SpecID: "123",
+		},
 		Params: url.Values{
 			"service":     []string{"agent"},
 			"relativeRef": []string{"/credentials"},
@@ -41,22 +53,26 @@ var GoldenAttrsPerDID = map[string]Attrs{
 		Fragment: "degree",
 	},
 	"did:example:123?versionTime=2021-05-10T17:00:00Z": {
-		Method: "example",
-		SpecID: "123",
+		DID: DID{
+			Method: "example",
+			SpecID: "123",
+		},
 		Params: url.Values{"versionTime": []string{"2021-05-10T17:00:00Z"}},
 	},
 	"did:example:123?service=files&relativeRef=/resume.pdf": {
-		Method: "example",
-		SpecID: "123",
+		DID: DID{
+			Method: "example",
+			SpecID: "123",
+		},
 		Params: url.Values{"service": []string{"files"},
 			"relativeRef": []string{"/resume.pdf"},
 		},
 	},
 }
 
-func TestParse(t *testing.T) {
-	for s, want := range GoldenAttrsPerDID {
-		got, err := Parse(s)
+func TestParseURL(t *testing.T) {
+	for s, want := range GoldenURLs {
+		got, err := ParseURL(s)
 		if err != nil {
 			t.Errorf("DID %q got error: %s", s, err)
 			continue
