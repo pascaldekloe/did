@@ -104,6 +104,11 @@ func (d DID) String() string {
 	return "did:" + d.Method + ":" + d.SpecID
 }
 
+// MarshalJSON implements the json.Marshaler interface.
+func (d DID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
+}
+
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (d *DID) UnmarshalJSON(bytes []byte) error {
 	var s string
@@ -180,6 +185,11 @@ func (u *URL) String() string {
 		return u.DID.String()
 	}
 	return u.GoURL().String()
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (u URL) MarshalJSON() ([]byte, error) {
+	return json.Marshal(u.String())
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.

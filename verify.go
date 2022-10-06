@@ -3,6 +3,7 @@ package did
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 )
 
 // VerificationMethod is a set of parameters that can be used together with a
@@ -27,6 +28,35 @@ func (method *VerificationMethod) AdditionalString(property string) (value strin
 		return value, json.Unmarshal([]byte(raw), &value)
 	}
 	return "", nil
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (method *VerificationMethod) MarshalJSON() ([]byte, error) {
+	buf := make([]byte, 0, 256)
+
+	buf = append(buf, `{"id":`...)
+	buf = strconv.AppendQuote(buf, method.ID.String())
+
+	buf = append(buf, `,"type":`...)
+	buf = strconv.AppendQuote(buf, method.Type)
+
+	buf = append(buf, `,"controller":`...)
+	buf = strconv.AppendQuote(buf, method.Controller.String())
+
+	for property, value := range method.Additional {
+		switch property {
+		case "id", "type", "controller":
+			return nil, fmt.Errorf(`found required DID verification-method property %q in additional set`, property)
+		}
+
+		buf = append(buf, ',')
+		buf = strconv.AppendQuote(buf, property)
+		buf = append(buf, ':')
+		buf = append(buf, value...)
+	}
+
+	buf = append(buf, '}')
+	return buf, nil
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
