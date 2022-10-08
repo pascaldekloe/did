@@ -1,6 +1,7 @@
 package did_test
 
 import (
+	"fmt"
 	"net/url"
 	"reflect"
 	"testing"
@@ -96,4 +97,29 @@ func TestParseURL(t *testing.T) {
 			t.Errorf("DID %q got fragment %q, want %q", s, got.Fragment, want.Fragment)
 		}
 	}
+}
+
+func ExampleDIDResolve() {
+	base := did.DID{Method: "example", SpecID: "101"}
+	tests := []string{
+		"/hello",
+		"any?",
+		"#body",
+		"did:example:*",
+		"http://localhost:8080",
+	}
+	for _, s := range tests {
+		URL, err := base.Resolve(s)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			fmt.Println(URL)
+		}
+	}
+	// Output:
+	// did:example:101/hello
+	// did:example:101/any
+	// did:example:101#body
+	// did:example:*
+	// http://localhost:8080
 }

@@ -99,6 +99,26 @@ ReadMethodName:
 	return d, nil
 }
 
+// Resolve returns an absolute URL, using the DID as a base URI.
+func (base DID) Resolve(s string) (string, error) {
+	p, err := url.Parse(s)
+	if err != nil {
+		return "", err
+	}
+
+	if p.IsAbs() {
+		return s, nil
+	}
+
+	u := URL{
+		DID:      base,
+		Path:     p.Path,
+		Params:   p.Query(),
+		Fragment: p.Fragment,
+	}
+	return u.String(), nil
+}
+
 // String returns the DID without any validation on the attribute values.
 func (d DID) String() string {
 	return "did:" + d.Method + ":" + d.SpecID
