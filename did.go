@@ -168,9 +168,14 @@ func ParseURL(s string) (*URL, error) {
 
 // GoURL returns a mapping to the Go model.
 func (u *URL) GoURL() *url.URL {
+	var pathSep string
+	if len(u.Path) != 0 && u.Path[0] != '/' {
+		pathSep = "/"
+	}
+
 	p := &url.URL{
 		Scheme:   "did",
-		Opaque:   u.Method + ":" + u.SpecID + u.Path,
+		Opaque:   u.Method + ":" + u.SpecID + pathSep + u.Path,
 		Fragment: u.Fragment,
 	}
 	if len(u.Params) != 0 {
