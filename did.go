@@ -9,11 +9,16 @@ import (
 	"strings"
 )
 
+const prefix = "did:"
+
 // DID contains the variable attributes.
 type DID struct {
-	Method string // name
+	// Method names the applicable scheme of the DID. The token value must
+	// consist of lower-case letters 'a'–'z' and/or decimals '0'–'9' only.
+	Method string
 
-	// Method-specific identifiers may contain percent-encodings.
+	// Method-specific identifiers may result into escaped characters with
+	// one or more percent-encodings.
 	SpecID string
 }
 
@@ -30,38 +35,45 @@ var (
 
 // Parse validates s in full, and it returns the mapping.
 func Parse(s string) (DID, error) {
-	const prefix = "did:"
+	var d DID
 	if !strings.HasPrefix(s, prefix) {
-		return DID{}, ErrScheme
+		return d, ErrScheme
 	}
-	i := len(prefix)
+	var err error
+	d.Method, err = readMethodName(s[len(prefix):])
+	if err != nil {
+		return d, err
+	}
+	d.SpecID, err = parseSpecID(s[len(prefix)+len(d.Method)+1:])
+	return d, err
+}
 
-ReadMethodName:
-	for {
-		if i >= len(s) {
-			return DID{}, errTerm
-		}
+// ReadMethodName returns s until separator ':'.
+func readMethodName(s string) (string, error) {
+	for i := 0; i < len(s); i++ {
 		switch s[i] {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
 			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z':
-			i++ // next
+			continue // valid
 
 		case ':':
-			break ReadMethodName // done
+			// one or more characters required
+			if i == 0 {
+				return "", errTerm
+			}
+			return s[:i], nil
 
 		default:
-			return DID{}, errChar
+			return "", errChar
 		}
 	}
-	d := DID{Method: s[len(prefix):i]}
-	i++
+	// separator ':' not found
+	return "", errTerm
+}
 
-	// read method-specific ID
-	if i >= len(s) {
-		return d, errTerm
-	}
-	for i < len(s) {
+func parseSpecID(s string) (string, error) {
+	for i := 0; i < len(s); i++ {
 		switch s[i] {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
@@ -69,34 +81,71 @@ ReadMethodName:
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
 			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 			'.', '-', '_':
-			i++ // next
+			continue // valid
 
 		case '%':
-			for n := 0; n < 2; n++ {
-				i++
-				if i >= len(s) {
-					return d, errTerm
-				}
-				switch s[i] {
-				case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F':
-					break // valid
-				default:
-					return d, errPrct
-				}
-			}
-			i++ // next
+			return unescape(s[:i], s[i:])
 
 		case '/', '?', '#':
-			d.SpecID = s[len(prefix)+len(d.Method)+1 : i]
-			return d, errURLPart
+			return s[:i], errURLPart
 
 		default:
-			return d, errChar
+			return "", errChar
 		}
 	}
+	return s, nil
+}
 
-	d.SpecID = s[len(prefix)+len(d.Method)+1:]
-	return d, nil
+// Unescape returns the prefix as is, plus s with its percent encodings
+// resolved.
+func unescape(prefix, s string) (string, error) {
+	var b strings.Builder
+	// every 3-byte escape produces one byte
+	b.Grow(len(prefix) + len(s))
+	b.WriteString(prefix)
+
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+			'.', '-', '_':
+			b.WriteByte(s[i])
+
+		case '%':
+			if i+2 >= len(s) {
+				return "", errTerm
+			}
+			n1 := hexNibble(s[i+1])
+			n2 := hexNibble(s[i+2])
+			i += 2
+			if n1 > 15 || n2 > 15 {
+				return "", errPrct
+			}
+			b.WriteByte(n1<<4 | n2)
+
+		case '/', '?', '#':
+			return b.String(), errURLPart
+
+		default:
+			return "", errChar
+		}
+	}
+	return b.String(), nil
+}
+
+// HexNibble return the numeric value of a hexadecimal character.
+func hexNibble(c byte) byte {
+	switch c {
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		return c - '0'
+	case 'A', 'B', 'C', 'D', 'E', 'F':
+		return c - 'A' + 10
+	default:
+		return 16
+	}
 }
 
 // Resolve returns an absolute URL, using the DID as a base URI.
@@ -119,9 +168,53 @@ func (base DID) Resolve(s string) (string, error) {
 	return u.String(), nil
 }
 
-// String returns the DID without any validation on the attribute values.
+var hexChars = [16]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'}
+
+// String returns the DID syntax.
 func (d DID) String() string {
-	return "did:" + d.Method + ":" + d.SpecID
+	i := 0
+	for {
+		if i >= len(d.SpecID) {
+			return prefix + d.Method + ":" + d.SpecID
+		}
+
+		switch d.SpecID[i] {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z':
+			i++ // next
+			continue
+		}
+
+		break
+	}
+	// needs percent-encoding
+
+	var b strings.Builder
+	// every byte-escape produces three bytes
+	b.Grow(20 + len(d.Method) + len(d.SpecID))
+	b.WriteString(prefix)
+	b.WriteString(d.Method)
+	b.WriteByte(':')
+	b.WriteString(d.SpecID[:i])
+
+	for s := d.SpecID; i < len(s); i++ {
+		switch c := s[i]; c {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+			'.', '-', '_':
+			b.WriteByte(c)
+
+		default:
+			b.WriteByte('%')
+			b.WriteByte(hexChars[c>>4])
+			b.WriteByte(hexChars[c&15])
+		}
+	}
+	return b.String()
 }
 
 // MarshalJSON implements the json.Marshaler interface.

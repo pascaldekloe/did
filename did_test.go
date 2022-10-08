@@ -99,6 +99,20 @@ func TestParseURL(t *testing.T) {
 	}
 }
 
+func ExampleDIDParse_percentEncoding() {
+	d, err := did.Parse("did:example:escaped%F0%9F%A4%96")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println("parsed: " + d.SpecID)
+	fmt.Println("string: " + d.String())
+	// Output:
+	// parsed: escaped🤖
+	// string: did:example:escaped%F0%9F%A4%96
+}
+
 func ExampleDIDResolve() {
 	base := did.DID{Method: "example", SpecID: "101"}
 	tests := []string{
@@ -108,18 +122,54 @@ func ExampleDIDResolve() {
 		"did:example:*",
 		"http://localhost:8080",
 	}
-	for _, s := range tests {
-		URL, err := base.Resolve(s)
+
+	for _, t := range tests {
+		s, err := base.Resolve(t)
 		if err != nil {
 			fmt.Println(err)
 		} else {
-			fmt.Println(URL)
+			fmt.Println("• " + s)
 		}
 	}
 	// Output:
-	// did:example:101/hello
-	// did:example:101/any
-	// did:example:101#body
-	// did:example:*
-	// http://localhost:8080
+	// • did:example:101/hello
+	// • did:example:101/any
+	// • did:example:101#body
+	// • did:example:*
+	// • http://localhost:8080
+}
+
+func FuzzParse(f *testing.F) {
+	f.Add("did:a:b")
+	f.Add("did:1:2%34")
+	f.Fuzz(func(t *testing.T, s string) {
+		did.Parse(s)
+	})
+}
+
+func FuzzDIDString(f *testing.F) {
+	f.Add("a", "b")
+	f.Add("1", "2%3")
+	f.Fuzz(func(t *testing.T, method, specID string) {
+		// omit invalid method names for fuzz test
+		if method == "" {
+			return
+		}
+		for _, r := range method {
+			if r < '0' || r > '9' && r < 'a' || r > 'z' {
+				return
+			}
+		}
+
+		d := did.DID{Method: method, SpecID: specID}
+		s := d.String()
+
+		d2, err := did.Parse(s)
+		if err != nil {
+			t.Fatalf("Parse error on String result %q: %s", s, err)
+		}
+		if d != d2 {
+			t.Fatalf("%#v became %#v after codec cycle with %q", d, d2, s)
+		}
+	})
 }
