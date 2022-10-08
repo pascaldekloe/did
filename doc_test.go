@@ -1,8 +1,10 @@
-package did
+package did_test
 
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/pascaldekloe/did"
 )
 
 // Example10 is borrowed from the W3C.
@@ -40,7 +42,7 @@ const example15 = `
 }`
 
 func TestDocSubjectJSON(t *testing.T) {
-	var doc Doc
+	var doc did.Doc
 	err := json.Unmarshal([]byte(example10), &doc)
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +55,7 @@ func TestDocSubjectJSON(t *testing.T) {
 }
 
 func TestDocControllersJSON(t *testing.T) {
-	var doc Doc
+	var doc did.Doc
 	err := json.Unmarshal([]byte(example11), &doc)
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +71,7 @@ func TestDocControllersJSON(t *testing.T) {
 }
 
 func TestVerificationRelationshipUnmarshalJSON(t *testing.T) {
-	var doc Doc
+	var doc did.Doc
 	err := json.Unmarshal([]byte(example15), &doc)
 	if err != nil {
 		t.Fatal(err)

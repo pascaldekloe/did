@@ -1,48 +1,50 @@
-package did
+package did_test
 
 import (
 	"net/url"
 	"reflect"
 	"testing"
+
+	"github.com/pascaldekloe/did"
 )
 
-var GoldenURLs = map[string]URL{
+var GoldenURLs = map[string]did.URL{
 	"did:example:123456789abcdefghi": {
-		DID: DID{
+		DID: did.DID{
 			Method: "example",
 			SpecID: "123456789abcdefghi",
 		},
 	},
 	"did:example:123456/path": {
-		DID: DID{
+		DID: did.DID{
 			Method: "example",
 			SpecID: "123456",
 		},
 		Path: "/path",
 	},
 	"did:example:123456?versionId=1": {
-		DID: DID{
+		DID: did.DID{
 			Method: "example",
 			SpecID: "123456",
 		},
 		Params: url.Values{"versionId": []string{"1"}},
 	},
 	"did:example:123#public-key-0": {
-		DID: DID{
+		DID: did.DID{
 			Method: "example",
 			SpecID: "123",
 		},
 		Fragment: "public-key-0",
 	},
 	"did:example:123#agent": {
-		DID: DID{
+		DID: did.DID{
 			Method: "example",
 			SpecID: "123",
 		},
 		Fragment: "agent",
 	},
 	"did:example:123?service=agent&relativeRef=/credentials#degree": {
-		DID: DID{
+		DID: did.DID{
 			Method: "example",
 			SpecID: "123",
 		},
@@ -53,14 +55,14 @@ var GoldenURLs = map[string]URL{
 		Fragment: "degree",
 	},
 	"did:example:123?versionTime=2021-05-10T17:00:00Z": {
-		DID: DID{
+		DID: did.DID{
 			Method: "example",
 			SpecID: "123",
 		},
 		Params: url.Values{"versionTime": []string{"2021-05-10T17:00:00Z"}},
 	},
 	"did:example:123?service=files&relativeRef=/resume.pdf": {
-		DID: DID{
+		DID: did.DID{
 			Method: "example",
 			SpecID: "123",
 		},
@@ -72,7 +74,7 @@ var GoldenURLs = map[string]URL{
 
 func TestParseURL(t *testing.T) {
 	for s, want := range GoldenURLs {
-		got, err := ParseURL(s)
+		got, err := did.ParseURL(s)
 		if err != nil {
 			t.Errorf("DID %q got error: %s", s, err)
 			continue
