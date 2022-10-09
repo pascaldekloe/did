@@ -82,9 +82,9 @@ func TestVerificationRelationshipUnmarshalJSON(t *testing.T) {
 	}
 
 	const want1 = "did:example:123456789abcdefghi#keys-1"
-	if n := len(doc.Authentication.URLRefs); n != 1 {
+	if n := len(doc.Authentication.URIRefs); n != 1 {
 		t.Errorf("got %d referenced methods, want 1", n)
-	} else if got := doc.Authentication.URLRefs[0]; got != want1 {
+	} else if got := doc.Authentication.URIRefs[0]; got != want1 {
 		t.Errorf("got referenced method %q, want %q", got, want1)
 	}
 

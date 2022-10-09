@@ -41,6 +41,10 @@ type Doc struct {
 	// mechanism that might be used by the DID subject to delegate a
 	// cryptographic capability to another party.
 	CapabilityDelegation *VerificationRelationship `json:"capabilityDelegation,omitempty"`
+
+	// Services are used to express ways of communicating with the Subject
+	// or associated entities.
+	Services []*Service `json:"service,omitempty"`
 }
 
 // Set represents a string, or a set of strings that confrom to the DID syntax.
@@ -92,7 +96,7 @@ func (set *Set) UnmarshalJSON(bytes []byte) error {
 // referenced.
 type VerificationRelationship struct {
 	Methods []*VerificationMethod // embedded
-	URLRefs []string              // referenced
+	URIRefs []string              // referenced
 }
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -108,7 +112,7 @@ func (r *VerificationRelationship) MarshalJSON() ([]byte, error) {
 	}
 
 	// URL refererences as JSON strings into array
-	for _, s := range r.URLRefs {
+	for _, s := range r.URIRefs {
 		buf[len(buf)-1] = ',' // flip array end
 		buf = strconv.AppendQuote(buf, s)
 		buf = append(buf, ']') // new array end
@@ -121,7 +125,7 @@ func (r *VerificationRelationship) MarshalJSON() ([]byte, error) {
 func (r *VerificationRelationship) UnmarshalJSON(bytes []byte) error {
 	// reset
 	r.Methods = r.Methods[:0]
-	r.URLRefs = r.URLRefs[:0]
+	r.URIRefs = r.URIRefs[:0]
 
 	switch bytes[0] {
 	case '[': // mixed array
@@ -156,7 +160,7 @@ func (r *VerificationRelationship) UnmarshalJSON(bytes []byte) error {
 			if err != nil {
 				return err
 			}
-			r.URLRefs = append(r.URLRefs, s)
+			r.URIRefs = append(r.URIRefs, s)
 
 		default:
 			return fmt.Errorf("DID set of verification methods entry is not a JSON object nor a JSON string: %.12q", raw)
