@@ -26,11 +26,11 @@ type DID struct {
 var ErrScheme = errors.New("not a DID")
 
 var (
-	errTerm = errors.New("incomplete DID")
-	errChar = errors.New("illegal character in DID")
-	errPrct = errors.New("broken percent-encoding in DID")
+	errTerm = fmt.Errorf("%w: incomplete", ErrInvalid)
+	errChar = fmt.Errorf("%w: illegal character", ErrInvalid)
+	errPrct = fmt.Errorf("%w: broken percent-encoding", ErrInvalid)
 
-	errURLPart = errors.New("URL selection ('/', '?' or '#') in DID")
+	errURLPart = fmt.Errorf("%w: URL character '/', '?' or '#' found", ErrInvalid)
 )
 
 // Parse validates s in full, and it returns the mapping.
