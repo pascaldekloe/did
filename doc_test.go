@@ -82,7 +82,6 @@ const example30 = `{
     ]
 }`
 
-
 // Example31 is borrowed from the W3C, excluding comments.
 // https://www.w3.org/TR/did-core/#example-did-document-with-many-different-key-types
 const example31 = `{
@@ -199,12 +198,9 @@ func TestDocControllersJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if n := len(doc.Controllers); n != 1 {
-		t.Fatalf("got %d controllers, want 1", n)
-	}
 	const want = "did:example:bcehfew7h32f32h7af3"
-	if got := doc.Controllers[0].String(); got != want {
-		t.Errorf("got subject %q, want %q", got, want)
+	if len(doc.Controllers) != 1 || !doc.Controllers.Contains(want) {
+		t.Errorf("got controllers %q, want [%q]", doc.Controllers, want)
 	}
 }
 

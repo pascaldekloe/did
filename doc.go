@@ -50,6 +50,16 @@ type Doc struct {
 // Set represents a string, or a set of strings that confrom to the DID syntax.
 type Set []DID
 
+// Contains returns whether any of the set entries equal s.
+func (set Set) Contains(s string) bool {
+	for _, d := range set {
+		if d.Equal(s) {
+			return true
+		}
+	}
+	return false
+}
+
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (set *Set) UnmarshalJSON(bytes []byte) error {
 	switch bytes[0] {

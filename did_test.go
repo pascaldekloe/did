@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/pascaldekloe/did"
@@ -99,7 +100,7 @@ func TestParseURL(t *testing.T) {
 	}
 }
 
-func ExampleDIDParse_percentEncoding() {
+func ExampleParse_percentEncoding() {
 	d, err := did.Parse("did:example:escaped%F0%9F%A4%96")
 	if err != nil {
 		fmt.Println(err)
@@ -111,6 +112,20 @@ func ExampleDIDParse_percentEncoding() {
 	// Output:
 	// parsed: escaped🤖
 	// string: did:example:escaped%F0%9F%A4%96
+}
+
+func TestDIDEqual(t *testing.T) {
+	// TODO(pascaldekloe): needs better test set
+	for s, u := range GoldenURLs {
+		// trim URL parts, if any
+		if i := strings.IndexAny(s, "/?#"); i >= 0 {
+			s = s[:i]
+		}
+
+		if !u.DID.Equal(s) {
+			t.Errorf("%#v.Equal(%q) got false, want true", u.DID, s)
+		}
+	}
 }
 
 func ExampleDIDResolve() {

@@ -148,6 +148,57 @@ func hexNibble(c byte) byte {
 	}
 }
 
+// Equal returns whether s is a valid URI, and whether s equals to d. The method
+// is compliant with the “Normalization and Comparison” rules as defined by RFC
+// 3986, section 6.
+func (d DID) Equal(s string) bool {
+	// scheme compare
+	if !strings.HasPrefix(s, prefix) {
+		return false // scheme mismatch
+	}
+	s = s[len(prefix):]
+
+	// method compare
+	if !strings.HasPrefix(s, d.Method) || len(s) <= len(d.Method) || s[len(d.Method)] != ':' {
+		return false
+	}
+	s = s[len(d.Method)+1:]
+
+	// method-specific identifier compare includes percent-encoding
+	for di := 0; di < len(d.SpecID); di++ {
+		c := d.SpecID[di]
+
+		if s == "" {
+			return false
+		}
+		switch s[0] {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z':
+			if s[0] != c {
+				return false
+			}
+
+		case '%':
+			if di+2 >= len(d.SpecID) {
+				return false // incomplete encoding
+			}
+			n1 := hexNibble(d.SpecID[di+1])
+			n2 := hexNibble(d.SpecID[di+2])
+			di += 2
+			if n1 > 15 || n2 > 15 || n1<<4|n2 != s[0] {
+				return false
+			}
+
+		default:
+			return false // invalid
+		}
+
+		s = s[1:] // next byte
+	}
+	return s == ""
+}
+
 // Resolve returns an absolute URL, using the DID as a base URI.
 func (base DID) Resolve(s string) (string, error) {
 	p, err := url.Parse(s)
