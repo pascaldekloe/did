@@ -148,25 +148,24 @@ func hexNibble(c byte) byte {
 	}
 }
 
-// Equal returns whether s is a valid URI, and whether s equals to d. The method
-// is compliant with the “Normalization and Comparison” rules as defined by RFC
-// 3986, section 6.
+// Equal returns whether s compares equal to d. The method is compliant with the
+// “Normalization and Comparison” rules as defined by RFC 3986, section 6.
 func (d DID) Equal(s string) bool {
 	// scheme compare
 	if !strings.HasPrefix(s, prefix) {
-		return false // scheme mismatch
+		return false
 	}
 	s = s[len(prefix):]
 
 	// method compare
-	if !strings.HasPrefix(s, d.Method) || len(s) <= len(d.Method) || s[len(d.Method)] != ':' {
+	if l := len(d.Method); l >= len(s) || s[l] != ':' || s[:l] != d.Method {
 		return false
 	}
 	s = s[len(d.Method)+1:]
 
 	// method-specific identifier compare includes percent-encoding
-	for di := 0; di < len(d.SpecID); di++ {
-		c := d.SpecID[di]
+	for i := 0; i < len(d.SpecID); i++ {
+		c := d.SpecID[i]
 
 		if s == "" {
 			return false
@@ -178,23 +177,17 @@ func (d DID) Equal(s string) bool {
 			if s[0] != c {
 				return false
 			}
+			s = s[1:] // next byte
 
 		case '%':
-			if di+2 >= len(d.SpecID) {
-				return false // incomplete encoding
-			}
-			n1 := hexNibble(d.SpecID[di+1])
-			n2 := hexNibble(d.SpecID[di+2])
-			di += 2
-			if n1 > 15 || n2 > 15 || n1<<4|n2 != s[0] {
+			if len(s) < 3 || hexvalOrZero(s[1], s[2]) != c {
 				return false
 			}
+			s = s[3:] // next byte
 
 		default:
 			return false // invalid
 		}
-
-		s = s[1:] // next byte
 	}
 	return s == ""
 }
@@ -342,6 +335,122 @@ func ParseURL(s string) (*URL, error) {
 		u.Params = p.Query()
 	}
 	return &u, nil
+}
+
+// Equal returns whether s compares equal to u. The method is compliant with the
+// “Normalization and Comparison” rules as defined by RFC 3986, section 6.
+//
+// Duplicate query-paramaters are compared in order of their respective
+// appearance, i.e., "?foo=1&foo=2" is not equal to "?foo=2&foo=1".
+func (u *URL) Equal(s string) bool {
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '/', '?', '#':
+			if !u.DID.Equal(s[:i]) {
+				return false
+			}
+
+			p, err := url.Parse(s[i:])
+			if err != nil {
+				return false
+			}
+			return p.Fragment == u.Fragment && pathEqual(p.RawPath, u.RawPath) && u.queryEqual(p)
+		}
+	}
+
+	return u.RawPath == "" && len(u.Params) == 0 && u.Fragment == "" && u.DID.Equal(s)
+}
+
+func pathEqual(s, t string) bool {
+	// fast path
+	if s == t {
+		return true
+	}
+
+	// trim root
+	if s == "" || t == "" {
+		return false
+	}
+	if s[0] == '/' {
+		s = s[1:]
+	}
+	if t[0] != '/' {
+		t = t[1:]
+	}
+
+	for {
+		switch {
+		case s == "":
+			return t == ""
+		case t == "":
+			return false
+
+		case s[0] == t[0]:
+			s = s[1:]
+			t = t[1:]
+
+		case s[0] == '/', t[0] == '/':
+			return false
+
+		case s[0] == '%' && len(s) > 2 && t[0] == hexvalOrZero(s[1], s[2]):
+			s = s[3:]
+			t = t[1:]
+		case t[0] == '%' && len(t) > 2 && s[0] == hexvalOrZero(t[1], t[2]):
+			s = s[1:]
+			t = t[3:]
+
+		default:
+			return false
+		}
+	}
+}
+
+func hexvalOrZero(a, b byte) (v byte) {
+	switch a {
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		v = a - '0'
+	case 'A', 'B', 'C', 'D', 'E', 'F':
+		v = a - 'A' + 10
+	default:
+		return 0
+	}
+	v <<= 4
+
+	switch b {
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		return v | (b - '0')
+	case 'A', 'B', 'C', 'D', 'E', 'F':
+		return v | (b - 'A' + 10)
+	default:
+		return 0
+	}
+}
+
+func (u *URL) queryEqual(p *url.URL) bool {
+	if p.RawQuery == "" {
+		return len(u.Params) == 0
+	}
+	if len(u.Params) == 0 {
+		return false
+	}
+
+	q := p.Query()
+	if len(q) != len(u.Params) {
+		return false
+	}
+
+	for name, values := range q {
+		match := u.Params[name]
+		if len(match) != len(values) {
+			return false
+		}
+		for i := range match {
+			if match[i] != values[i] {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // GoURL returns a mapping to the Go model.
