@@ -22,7 +22,7 @@ var GoldenURLs = map[string]did.URL{
 			Method: "example",
 			SpecID: "123456",
 		},
-		Path: "/path",
+		RawPath: "/path",
 	},
 	"did:example:123456?versionId=1": {
 		DID: did.DID{
@@ -88,8 +88,8 @@ func TestParseURL(t *testing.T) {
 		if got.SpecID != want.SpecID {
 			t.Errorf("DID %q got method-specific identifier %q, want %q", s, got.SpecID, want.SpecID)
 		}
-		if got.Path != want.Path {
-			t.Errorf("DID %q got path %q, want %q", s, got.Path, want.Path)
+		if got.RawPath != want.RawPath {
+			t.Errorf("DID %q got raw path %q, want %q", s, got.RawPath, want.RawPath)
 		}
 		if !reflect.DeepEqual(got.Params, want.Params) {
 			t.Errorf("DID %q got params %q, want %q", s, got.Params, want.Params)

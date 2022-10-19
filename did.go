@@ -212,10 +212,15 @@ func (base DID) Resolve(s string) (string, error) {
 
 	u := URL{
 		DID:      base,
-		Path:     p.Path,
+		RawPath:  p.Path,
 		Params:   p.Query(),
 		Fragment: p.Fragment,
 	}
+	if p.RawPath != "" {
+		u.RawPath = p.RawPath
+	}
+	// BUG(pascaldekloe): Resolve does no apply percent encoding on RawPath yet.
+
 	return u.String(), nil
 }
 
@@ -292,7 +297,7 @@ func (d *DID) UnmarshalJSON(bytes []byte) error {
 // URL holds all attributes of a DID URL.
 type URL struct {
 	DID
-	Path     string     // optional
+	RawPath  string     // optional
 	Params   url.Values // optional
 	Fragment string     // optional
 }
@@ -313,17 +318,26 @@ func ParseURL(s string) (*URL, error) {
 		return nil, err
 	}
 
+	u := URL{DID: d}
+
+	// read path
+	if s != "" && s[0] == '/' {
+		pathEnd := strings.IndexAny(s, "?#")
+		if pathEnd < 0 {
+			u.RawPath = s
+			return &u, nil
+		}
+
+		u.RawPath = s[:pathEnd]
+		s = s[pathEnd:]
+	}
+
 	// read URL additions
 	p, err := url.Parse(s)
 	if err != nil {
 		return nil, fmt.Errorf("malformed DID selection: %w", err)
 	}
-
-	u := URL{
-		DID:      d,
-		Path:     p.Path,
-		Fragment: p.Fragment,
-	}
+	u.Fragment = p.Fragment
 	if p.RawQuery != "" {
 		u.Params = p.Query()
 	}
@@ -333,13 +347,13 @@ func ParseURL(s string) (*URL, error) {
 // GoURL returns a mapping to the Go model.
 func (u *URL) GoURL() *url.URL {
 	var pathSep string
-	if len(u.Path) != 0 && u.Path[0] != '/' {
+	if u.RawPath != "" && u.RawPath[0] != '/' {
 		pathSep = "/"
 	}
 
 	p := &url.URL{
 		Scheme:   "did",
-		Opaque:   u.Method + ":" + u.SpecID + pathSep + u.Path,
+		Opaque:   u.Method + ":" + u.SpecID + pathSep + u.RawPath,
 		Fragment: u.Fragment,
 	}
 	if len(u.Params) != 0 {
@@ -350,7 +364,7 @@ func (u *URL) GoURL() *url.URL {
 
 // String returns the DID URL.
 func (u *URL) String() string {
-	if u.Path == "" && len(u.Params) == 0 && u.Fragment == "" {
+	if u.RawPath == "" && len(u.Params) == 0 && u.Fragment == "" {
 		return u.DID.String()
 	}
 	return u.GoURL().String()
