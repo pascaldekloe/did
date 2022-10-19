@@ -158,7 +158,17 @@ func FuzzParse(f *testing.F) {
 	f.Add("did:a:b")
 	f.Add("did:1:2%34")
 	f.Fuzz(func(t *testing.T, s string) {
-		did.Parse(s)
+		_, err := did.Parse(s)
+		switch e := err.(type) {
+		case nil:
+			break // OK
+		case *did.SyntaxError:
+			if e.S != s {
+				t.Errorf("Parse(%q) got SyntaxError.S %q", s, e.S)
+			}
+		default:
+			t.Errorf("got not a SyntaxError: %s", err)
+		}
 	})
 }
 

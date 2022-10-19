@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const prefix = "did:"
+const prefix = "did:" // URI scheme selection
 
 // DID contains the variable attributes.
 type DID struct {
@@ -25,32 +25,72 @@ type DID struct {
 // ErrScheme denies an input string.
 var ErrScheme = errors.New("not a DID")
 
-var (
-	errTerm = fmt.Errorf("%w: incomplete", ErrInvalid)
-	errChar = fmt.Errorf("%w: illegal character", ErrInvalid)
-	errPrct = fmt.Errorf("%w: broken percent-encoding", ErrInvalid)
+// SyntaxError denies a DID on validation.
+type SyntaxError struct {
+	// S is the original input as provided to the parser.
+	S string
 
-	errURLPart = fmt.Errorf("%w: URL character '/', '?' or '#' found", ErrInvalid)
-)
+	// I has the index in S of the first illegal character [byte], with
+	// len(S) for an unexpect end of S, or a negative value for undefined.
+	I int
 
-// Parse validates s in full, and it returns the mapping.
-func Parse(s string) (DID, error) {
-	var d DID
-	if !strings.HasPrefix(s, prefix) {
-		return d, ErrScheme
-	}
-	var err error
-	d.Method, err = readMethodName(s[len(prefix):])
-	if err != nil {
-		return d, err
-	}
-	d.SpecID, err = parseSpecID(s[len(prefix)+len(d.Method)+1:])
-	return d, err
+	// Err may specify an underlying cause, such as ErrScheme.
+	Err error
 }
 
-// ReadMethodName returns s until separator ':'.
-func readMethodName(s string) (string, error) {
-	for i := 0; i < len(s); i++ {
+// Error implements the standard error interface.
+func (e *SyntaxError) Error() string {
+	switch {
+	case e.Err != nil:
+		return "invalid DID: " + e.Error()
+
+	case e.I < 0:
+		return "invalid DID"
+
+	case e.I >= len(e.S):
+		return "incomplete DID"
+
+	case e.S[e.I] == '%':
+		if len(e.S)-e.I < 3 {
+			return "incomplete DID percent-encoding"
+		}
+		return fmt.Sprintf("illegal DID percent-encoding digits %q", e.S[e.I+1:e.I+3])
+
+	default:
+		return fmt.Sprintf("illegal character %q at DID byte № %d", e.S[e.I], e.I+1)
+	}
+}
+
+// Unwrap implements the errors.Unwrap convention.
+func (e SyntaxError) Unwrap() error {
+	return e.Err
+}
+
+// Parse validates s in full, and it returns the mapping. If there is an error,
+// it will be of type *SyntaxError.
+func Parse(s string) (DID, error) {
+	method, err := parseMethodName(s)
+	if err != nil {
+		return DID{}, err
+	}
+	specID, end := parseSpecID(s, len(prefix)+len(method)+1)
+	if end < len(s) || specID == "" {
+		return DID{}, &SyntaxError{S: s, I: end}
+	}
+	return DID{Method: method, SpecID: specID}, nil
+}
+
+func parseMethodName(s string) (string, error) {
+	for i := range prefix {
+		if i >= len(s) {
+			return "", &SyntaxError{S: s, I: i}
+		}
+		if s[i] != prefix[i] {
+			return "", &SyntaxError{S: s, I: i, Err: ErrScheme}
+		}
+	}
+
+	for i := len(prefix); i < len(s); i++ {
 		switch s[i] {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
@@ -59,21 +99,31 @@ func readMethodName(s string) (string, error) {
 
 		case ':':
 			// one or more characters required
-			if i == 0 {
-				return "", errTerm
+			if i == len(prefix) {
+				return "", &SyntaxError{S: s, I: len(prefix)}
 			}
-			return s[:i], nil
+			return s[len(prefix):i], nil
 
 		default:
-			return "", errChar
+			// illegal character
+			return "", &SyntaxError{S: s, I: i}
 		}
 	}
 	// separator ':' not found
-	return "", errTerm
+	return "", &SyntaxError{S: s, I: len(s)}
 }
 
-func parseSpecID(s string) (string, error) {
-	for i := 0; i < len(s); i++ {
+// ParseSpecID reads s[offset:], and returns the method-specific identifier fully escaped.
+func parseSpecID(s string, offset int) (specID string, end int) {
+	i := offset
+
+NoEscapes:
+	for {
+		if i >= len(s) {
+			// best-case scenario
+			return s[offset:], len(s)
+		}
+
 		switch s[i] {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
@@ -81,30 +131,30 @@ func parseSpecID(s string) (string, error) {
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
 			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 			'.', '-', '_':
-			continue // valid
+			i++ // valid
 
 		case '%':
-			return unescape(s[:i], s[i:])
+			break NoEscapes
 
-		case '/', '?', '#':
-			return s[:i], errURLPart
+		case ':':
+			// must match: *( *idchar ":" ) 1*idchar
+			if i == len(s)-1 {
+				return "", i
+			}
+			i++
 
 		default:
-			return "", errChar
+			// illegal character
+			return s[offset:i], i
 		}
 	}
-	return s, nil
-}
 
-// Unescape returns the prefix as is, plus s with its percent encodings
-// resolved.
-func unescape(prefix, s string) (string, error) {
 	var b strings.Builder
-	// every 3-byte escape produces one byte
-	b.Grow(len(prefix) + len(s))
-	b.WriteString(prefix)
+	// every 3-byte escape produces 1 byte
+	b.Grow(len(s) - offset)
+	b.WriteString(s[offset:i])
 
-	for i := 0; i < len(s); i++ {
+	for i < len(s) {
 		switch s[i] {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
@@ -113,46 +163,64 @@ func unescape(prefix, s string) (string, error) {
 			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 			'.', '-', '_':
 			b.WriteByte(s[i])
+			i++
+
+		case ':':
+			// must match: *( *idchar ":" ) 1*idchar
+			if i == len(s)-1 {
+				return "", i
+			}
+			b.WriteByte(s[i])
+			i++
 
 		case '%':
 			if i+2 >= len(s) {
-				return "", errTerm
+				return "", i
 			}
-			n1 := hexNibble(s[i+1])
-			n2 := hexNibble(s[i+2])
-			i += 2
-			if n1 > 15 || n2 > 15 {
-				return "", errPrct
-			}
-			b.WriteByte(n1<<4 | n2)
 
-		case '/', '?', '#':
-			return b.String(), errURLPart
+			var v byte
+
+			// decode first nibble
+			switch c := s[i+1]; c {
+			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+				v = c - '0'
+			case 'A', 'B', 'C', 'D', 'E', 'F':
+				v = c - 'A' + 10
+			default:
+				// illegal character
+				return "", i
+			}
+
+			v <<= 4
+
+			// decode second nibble
+			switch c := s[i+2]; c {
+			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+				v |= c - '0'
+			case 'A', 'B', 'C', 'D', 'E', 'F':
+				v |= c - 'A' + 10
+			default:
+				// illegal character
+				return "", i
+			}
+
+			b.WriteByte(v)
+			i += 3
 
 		default:
-			return "", errChar
+			// illegal character
+			return b.String(), i
 		}
 	}
-	return b.String(), nil
-}
 
-// HexNibble return the numeric value of a hexadecimal character.
-func hexNibble(c byte) byte {
-	switch c {
-	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-		return c - '0'
-	case 'A', 'B', 'C', 'D', 'E', 'F':
-		return c - 'A' + 10
-	default:
-		return 16
-	}
+	return b.String(), len(s)
 }
 
 // Equal returns whether s compares equal to d. The method is compliant with the
 // “Normalization and Comparison” rules as defined by RFC 3986, section 6.
 func (d DID) Equal(s string) bool {
 	// scheme compare
-	if !strings.HasPrefix(s, prefix) {
+	if len(s) < len(prefix) || s[:len(prefix)] != prefix {
 		return false
 	}
 	s = s[len(prefix):]
@@ -295,40 +363,54 @@ type URL struct {
 	Fragment string     // optional
 }
 
-// ParseURL validates s in full, and it returns the mapping.
+// ParseURL validates s in full, and it returns the mapping. If there is an
+// error, it will be of type *SyntaxError.
 func ParseURL(s string) (*URL, error) {
-	d, err := Parse(s)
-	switch err {
-	case nil:
-		// no additions to DID
-		return &URL{DID: d}, nil
-
-	case errURLPart:
-		// continue with additions
-		s = s[5+len(d.Method)+len(d.SpecID):]
-
-	default:
+	method, err := parseMethodName(s)
+	if err != nil {
 		return nil, err
 	}
 
-	u := URL{DID: d}
-
-	// read path
-	if s != "" && s[0] == '/' {
-		pathEnd := strings.IndexAny(s, "?#")
-		if pathEnd < 0 {
-			u.RawPath = s
-			return &u, nil
+	specID, end := parseSpecID(s, len(prefix)+len(method)+1)
+	u := URL{DID: DID{Method: method, SpecID: specID}}
+	if end >= len(s) {
+		if specID == "" {
+			return nil, &SyntaxError{S: s, I: len(s)}
 		}
 
-		u.RawPath = s[:pathEnd]
-		s = s[pathEnd:]
+		// no query and/or fragment
+		return &u, nil
 	}
 
-	// read URL additions
-	p, err := url.Parse(s)
+	switch s[end] {
+	default:
+		return nil, &SyntaxError{S: s, I: end}
+
+	case '#', '?':
+		break // good
+
+	case '/':
+		offset := end
+	PathRead:
+		for {
+			end++
+			if end >= len(s) {
+				u.RawPath = s[offset:]
+				return &u, nil
+			}
+			// BUG(pascaldekloe): ParseURL does not validate the path.
+			switch s[end] {
+			case '#', '?':
+				u.RawPath = s[offset:end]
+				break PathRead
+			}
+		}
+	}
+	// got URL fragment and/or query in s[end:]
+
+	p, err := url.Parse(s[end:])
 	if err != nil {
-		return nil, fmt.Errorf("malformed DID selection: %w", err)
+		return nil, &SyntaxError{S: s, Err: err}
 	}
 	u.Fragment = p.Fragment
 	if p.RawQuery != "" {
