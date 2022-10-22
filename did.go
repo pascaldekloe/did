@@ -436,14 +436,19 @@ func (u *URL) Equal(s string) bool {
 			if err != nil {
 				return false
 			}
-			return p.Fragment == u.Fragment && pathEqual(p.RawPath, u.RawPath) && u.queryEqual(p)
+			return u.Fragment == p.Fragment && pathEqual(u.RawPath, p) && u.queryEqual(p)
 		}
 	}
 
 	return u.RawPath == "" && len(u.Params) == 0 && u.Fragment == "" && u.DID.Equal(s)
 }
 
-func pathEqual(s, t string) bool {
+func pathEqual(s string, u *url.URL) bool {
+	t := u.RawPath
+	if t == "" {
+		t = u.Path
+	}
+
 	// fast path
 	if s == t {
 		return true
@@ -456,7 +461,7 @@ func pathEqual(s, t string) bool {
 	if s[0] == '/' {
 		s = s[1:]
 	}
-	if t[0] != '/' {
+	if t[0] == '/' {
 		t = t[1:]
 	}
 

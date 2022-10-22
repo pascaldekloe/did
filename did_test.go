@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/pascaldekloe/did"
@@ -100,6 +99,63 @@ func TestParseURL(t *testing.T) {
 	}
 }
 
+// SelectEquals groups equivalent DID URL additions.
+var SelectEquals = [][]string{
+	{
+		"/escaped%F0%9F%A4%96",
+		"/%65scaped%F0%9F%A4%96",
+		"/escap%65d%F0%9F%A4%96",
+	},
+	{
+		"#escaped%F0%9F%A4%96",
+		"#%65scaped%F0%9F%A4%96",
+		"#escap%65d%F0%9F%A4%96",
+	},
+}
+
+var URLEquals = func() [][]string {
+	// compile equality groups from DIDEquals and SelectEquals
+	var groups [][]string
+	for _, DIDs := range DIDEquals {
+		for _, selects := range SelectEquals {
+			// apply each selection on each DID
+			equals := make([]string, 0, len(DIDs)*len(selects))
+			for _, d := range DIDs {
+				for _, sel := range selects {
+					equals = append(equals, d+sel)
+				}
+			}
+
+			groups = append(groups, equals)
+		}
+	}
+	return groups
+}()
+
+func TestURLEqual(t *testing.T) {
+	for i, equals := range URLEquals {
+		for _, s := range equals {
+			u, err := did.ParseURL(s)
+			if err != nil {
+				t.Fatalf("ParseURL(%q) error: %s", s, err)
+			}
+
+			// compare all groups
+			for j, equals := range URLEquals {
+				want := i == j // same group
+
+				// compare each entry, including self
+				for _, e := range equals {
+					got := u.Equal(e)
+					if got != want {
+						t.Errorf("ParseURL(%q) Equal(%q) got %t, want %t\nparsed as %#v", s, e, got, want, u)
+					}
+				}
+			}
+		}
+	}
+}
+
 func ExampleParse_percentEncoding() {
 	d, err := did.Parse("did:example:escaped%F0%9F%A4%96")
 	if err != nil {
@@ -114,16 +170,39 @@ func ExampleParse_percentEncoding() {
 	// string: did:example:escaped%F0%9F%A4%96
 }
 
-func TestDIDEqual(t *testing.T) {
-	// TODO(pascaldekloe): needs better test set
-	for s, u := range GoldenURLs {
-		// trim URL parts, if any
-		if i := strings.IndexAny(s, "/?#"); i >= 0 {
-			s = s[:i]
-		}
+// DIDEquals groups equivalent DIDs.
+var DIDEquals = [][]string{
+	{
+		"did:example:escaped%F0%9F%A4%96",
+		"did:example:%65scaped%F0%9F%A4%96",
+		"did:example:escap%65d%F0%9F%A4%96",
+	},
+	{
+		"did:tricky:%3Afoo%2F",
+		"did:tricky:%3A%66%6F%6F%2F",
+	},
+}
 
-		if !u.DID.Equal(s) {
-			t.Errorf("%#v.Equal(%q) got false, want true", u.DID, s)
+func TestDIDEqual(t *testing.T) {
+	for i, equals := range DIDEquals {
+		for _, s := range equals {
+			d, err := did.Parse(s)
+			if err != nil {
+				t.Fatalf("Parse(%q) error: %s", s, err)
+			}
+
+			// compare all groups
+			for j, equals := range DIDEquals {
+				want := i == j // same group
+
+				// compare each entry, including self
+				for _, e := range equals {
+					got := d.Equal(e)
+					if got != want {
+						t.Errorf("Parse(%q) Equal(%q) got %t, want %t\nparsed as %#v", s, e, got, want, d)
+					}
+				}
+			}
 		}
 	}
 }
