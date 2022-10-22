@@ -42,7 +42,7 @@ type SyntaxError struct {
 func (e *SyntaxError) Error() string {
 	switch {
 	case e.Err != nil:
-		return "invalid DID: " + e.Error()
+		return "invalid DID: " + e.Err.Error()
 
 	case e.I < 0:
 		return "invalid DID"
