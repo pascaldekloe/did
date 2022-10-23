@@ -150,7 +150,7 @@ var GoldenURLs = map[string]did.URL{
 			Method: "example",
 			SpecID: "123456",
 		},
-		Params: url.Values{"versionId": []string{"1"}},
+		Query: url.Values{"versionId": []string{"1"}},
 	},
 	"did:example:123#public-key-0": {
 		DID: did.DID{
@@ -171,7 +171,7 @@ var GoldenURLs = map[string]did.URL{
 			Method: "example",
 			SpecID: "123",
 		},
-		Params: url.Values{
+		Query: url.Values{
 			"service":     []string{"agent"},
 			"relativeRef": []string{"/credentials"},
 		},
@@ -182,14 +182,14 @@ var GoldenURLs = map[string]did.URL{
 			Method: "example",
 			SpecID: "123",
 		},
-		Params: url.Values{"versionTime": []string{"2021-05-10T17:00:00Z"}},
+		Query: url.Values{"versionTime": []string{"2021-05-10T17:00:00Z"}},
 	},
 	"did:example:123?service=files&relativeRef=/resume.pdf": {
 		DID: did.DID{
 			Method: "example",
 			SpecID: "123",
 		},
-		Params: url.Values{"service": []string{"files"},
+		Query: url.Values{"service": []string{"files"},
 			"relativeRef": []string{"/resume.pdf"},
 		},
 	},
@@ -212,8 +212,8 @@ func TestParseURL(t *testing.T) {
 		if got.RawPath != want.RawPath {
 			t.Errorf("DID %q got raw path %q, want %q", s, got.RawPath, want.RawPath)
 		}
-		if !reflect.DeepEqual(got.Params, want.Params) {
-			t.Errorf("DID %q got params %q, want %q", s, got.Params, want.Params)
+		if !reflect.DeepEqual(got.Query, want.Query) {
+			t.Errorf("DID %q got params %q, want %q", s, got.Query, want.Query)
 		}
 		if got.Fragment != want.Fragment {
 			t.Errorf("DID %q got fragment %q, want %q", s, got.Fragment, want.Fragment)

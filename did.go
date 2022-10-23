@@ -274,7 +274,7 @@ func (base DID) Resolve(s string) (string, error) {
 	u := URL{
 		DID:      base,
 		RawPath:  p.Path,
-		Params:   p.Query(),
+		Query:    p.Query(),
 		Fragment: p.Fragment,
 	}
 	if p.RawPath != "" {
@@ -359,7 +359,7 @@ func (d *DID) UnmarshalJSON(bytes []byte) error {
 type URL struct {
 	DID
 	RawPath  string     // optional
-	Params   url.Values // optional
+	Query    url.Values // optional
 	Fragment string     // optional
 }
 
@@ -414,7 +414,7 @@ func ParseURL(s string) (*URL, error) {
 	}
 	u.Fragment = p.Fragment
 	if p.RawQuery != "" {
-		u.Params = p.Query()
+		u.Query = p.Query()
 	}
 	return &u, nil
 }
@@ -440,7 +440,7 @@ func (u *URL) Equal(s string) bool {
 		}
 	}
 
-	return u.RawPath == "" && len(u.Params) == 0 && u.Fragment == "" && u.DID.Equal(s)
+	return u.RawPath == "" && len(u.Query) == 0 && u.Fragment == "" && u.DID.Equal(s)
 }
 
 func pathEqual(s string, u *url.URL) bool {
@@ -515,19 +515,19 @@ func hexvalOrZero(a, b byte) (v byte) {
 
 func (u *URL) queryEqual(p *url.URL) bool {
 	if p.RawQuery == "" {
-		return len(u.Params) == 0
+		return len(u.Query) == 0
 	}
-	if len(u.Params) == 0 {
+	if len(u.Query) == 0 {
 		return false
 	}
 
 	q := p.Query()
-	if len(q) != len(u.Params) {
+	if len(q) != len(u.Query) {
 		return false
 	}
 
 	for name, values := range q {
-		match := u.Params[name]
+		match := u.Query[name]
 		if len(match) != len(values) {
 			return false
 		}
@@ -552,15 +552,15 @@ func (u *URL) GoURL() *url.URL {
 		Opaque:   u.Method + ":" + u.SpecID + pathSep + u.RawPath,
 		Fragment: u.Fragment,
 	}
-	if len(u.Params) != 0 {
-		p.RawQuery = u.Params.Encode()
+	if len(u.Query) != 0 {
+		p.RawQuery = u.Query.Encode()
 	}
 	return p
 }
 
 // String returns the DID URL.
 func (u *URL) String() string {
-	if u.RawPath == "" && len(u.Params) == 0 && u.Fragment == "" {
+	if u.RawPath == "" && len(u.Query) == 0 && u.Fragment == "" {
 		return u.DID.String()
 	}
 	return u.GoURL().String()
