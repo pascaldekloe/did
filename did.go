@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 )
 
 const prefix = "did:" // URI scheme selection
@@ -564,6 +565,51 @@ func (u *URL) String() string {
 		return u.DID.String()
 	}
 	return u.GoURL().String()
+}
+
+var (
+	errVersionIDDupe   = errors.New("duplicate versionId in DID URL")
+	errVersionTimeDupe = errors.New("duplicate versionTime in DID URL")
+)
+
+// VersionParams returns the standardised "versionId" and "versionTime".
+func (u *URL) VersionParams() (string, time.Time, error) {
+	var s string
+	switch a := u.Query["versionId"]; len(a) {
+	case 0:
+		break
+	case 1:
+		s = a[0]
+	default:
+		return "", time.Time{}, errVersionIDDupe
+	}
+
+	var t time.Time
+	switch a := u.Query["versionTime"]; len(a) {
+	case 0:
+		break
+	case 1:
+		var err error
+		t, err = time.Parse(a[0], time.RFC3339)
+		if err != nil {
+			return "", time.Time{}, errVersionTimeDupe
+		}
+	default:
+		return "", time.Time{}, errVersionTimeDupe
+	}
+
+	return s, t, nil
+}
+
+// SetVersionParams installs the standardised "versionId" and "versionTime".
+func (u *URL) SetVersionParams(s string, t time.Time) {
+	if s == "" {
+		u.Query["versionId"] = append(u.Query["versionId"][:0], s)
+	}
+
+	if !t.IsZero() {
+		u.Query["versionTime"] = append(u.Query["versionTime"][:0], t.Format(time.RFC3339))
+	}
 }
 
 // MarshalJSON implements the json.Marshaler interface.
