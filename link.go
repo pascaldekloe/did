@@ -103,7 +103,7 @@ func (method *VerificationMethod) popPropertyInto(name string, pointer any) erro
 // interaction.
 type Service struct {
 	ID       url.URL         `json:"id"`
-	Types    []string        `json:"type"`
+	Types    []string        `json:"type"` // one or more required
 	Endpoint ServiceEndpoint `json:"serviceEndpoint"`
 
 	// Each service extension MAY include additional properties and MAY
@@ -121,6 +121,8 @@ func (service *Service) AdditionalString(property string) (value string, _ error
 	return "", nil
 }
 
+var errNoServiceType = errors.New("no DID service type set")
+
 // MarshalJSON implements the json.Marshaler interface.
 func (srv *Service) MarshalJSON() ([]byte, error) {
 	buf := make([]byte, 0, 256)
@@ -131,7 +133,7 @@ func (srv *Service) MarshalJSON() ([]byte, error) {
 	buf = append(buf, `,"type":`...)
 	switch len(srv.Types) {
 	case 0:
-		return nil, errors.New(`required DID service property "type" has on value`)
+		return nil, errNoServiceType
 	case 1:
 		buf = strconv.AppendQuote(buf, srv.Types[0])
 	default:
@@ -215,11 +217,13 @@ type ServiceEndpoint struct {
 	Objects []json.RawMessage
 }
 
+var errNoServiceEndpoint = errors.New("no DID service endpoint set")
+
 // MarshalJSON implements the json.Marshaler interface.
 func (e *ServiceEndpoint) MarshalJSON() ([]byte, error) {
 	switch {
 	case len(e.URIRefs) == 0 && len(e.Objects) == 0:
-		return []byte{'[', ']'}, nil
+		return nil, errNoServiceEndpoint
 	case len(e.URIRefs) == 1 && len(e.Objects) == 0:
 		return json.Marshal(e.URIRefs[0])
 	case len(e.URIRefs) == 0 && len(e.Objects) == 1:

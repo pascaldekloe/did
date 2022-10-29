@@ -9,7 +9,7 @@ import (
 // JSON is the media type for JSON document production and consumption.
 const JSON = "application/did+json"
 
-// Doc holds the “core properties” of a DID document.
+// Doc holds the “core properties” of a DID document. Only Subject is required.
 type Doc struct {
 	Subject     DID `json:"id"`
 	Controllers Set `json:"controller,omitempty"`
