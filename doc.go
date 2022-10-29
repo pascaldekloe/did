@@ -1,3 +1,8 @@
+// JSON-LD is omitted by design. According to the standard: “A remote context
+// may also be referenced using a relative URL, which is resolved relative to
+// the location of the document containing the reference.”. On top of that,
+// “JSON documents can be interpreted as JSON-LD without having to be modified
+// by referencing a context via an HTTP Link Header …”.
 package did
 
 import (
