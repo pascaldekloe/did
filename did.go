@@ -584,21 +584,18 @@ func (u *URL) VersionParams() (string, time.Time, error) {
 		return "", time.Time{}, errVersionIDDupe
 	}
 
-	var t time.Time
 	switch a := u.Query["versionTime"]; len(a) {
 	case 0:
-		break
+		return s, time.Time{}, nil
 	case 1:
-		var err error
-		t, err = time.Parse(a[0], time.RFC3339)
+		t, err := time.Parse(time.RFC3339, a[0])
 		if err != nil {
-			return "", time.Time{}, errVersionTimeDupe
+			return "", time.Time{}, fmt.Errorf("versionTime in DID URL: %w", err)
 		}
+		return s, t, nil
 	default:
 		return "", time.Time{}, errVersionTimeDupe
 	}
-
-	return s, t, nil
 }
 
 // SetVersionParams installs the standardised "versionId" and "versionTime".

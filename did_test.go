@@ -5,9 +5,18 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/pascaldekloe/did"
 )
+
+// Example3 is borrowed from the W3C.
+// https://www.w3.org/TR/did-core/#example-3
+var example3 = "did:example:123456?versionId=1"
+
+// Example7 is borrowed from the W3C.
+// https://www.w3.org/TR/did-core/#example-a-did-url-with-a-versiontime-did-parameter
+var example7 = "did:example:123?versionTime=2021-05-10T17:00:00Z"
 
 func ExampleParse_percentEncoding() {
 	d, err := did.Parse("did:example:escaped%F0%9F%A4%96")
@@ -145,7 +154,7 @@ var GoldenURLs = map[string]did.URL{
 		},
 		RawPath: "/path",
 	},
-	"did:example:123456?versionId=1": {
+	example3: {
 		DID: did.DID{
 			Method: "example",
 			SpecID: "123456",
@@ -177,7 +186,7 @@ var GoldenURLs = map[string]did.URL{
 		},
 		Fragment: "degree",
 	},
-	"did:example:123?versionTime=2021-05-10T17:00:00Z": {
+	example7: {
 		DID: did.DID{
 			Method: "example",
 			SpecID: "123",
@@ -276,4 +285,48 @@ func TestURLEqual(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestURLVersionParams(t *testing.T) {
+	t.Run("ID", func(t *testing.T) {
+		sample := example3
+		const want = "1"
+
+		u, err := did.ParseURL(sample)
+		if err != nil {
+			t.Fatalf("%s parse error: %s", sample, err)
+		}
+
+		vID, vTime, err := u.VersionParams()
+		if err != nil {
+			t.Fatalf("%s got error: %s", sample, err)
+		}
+		if vID != want {
+			t.Errorf("%s got ID %q, want %q", sample, vID, want)
+		}
+		if !vTime.IsZero() {
+			t.Errorf("%s got time %s, want zero", sample, vTime)
+		}
+	})
+
+	t.Run("time", func(t *testing.T) {
+		sample := example7
+		want := time.Date(2021, 05, 10, 17, 00, 00, 0, time.UTC)
+
+		u, err := did.ParseURL(sample)
+		if err != nil {
+			t.Fatalf("%s parse error: %s", sample, err)
+		}
+
+		vID, vTime, err := u.VersionParams()
+		if err != nil {
+			t.Fatalf("%s got error: %s", sample, err)
+		}
+		if vID != "" {
+			t.Errorf("%s got ID %q, want zero", sample, vID)
+		}
+		if !vTime.Equal(want) {
+			t.Errorf("%s got time %s, want %s", sample, vTime, want)
+		}
+	})
 }
