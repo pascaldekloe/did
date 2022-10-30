@@ -11,6 +11,9 @@ import (
 	"strconv"
 )
 
+// V1 is the namespace URI.
+const V1 = "https://www.w3.org/ns/did/v1"
+
 // JSON is the media type for JSON document production and consumption.
 const JSON = "application/did+json"
 
