@@ -287,6 +287,64 @@ func TestURLEqual(t *testing.T) {
 	}
 }
 
+func ExampleURL_PathWithEscape() {
+	u, err := did.ParseURL("did:example:123456/path%2Fesc")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(u.PathWithEscape('\\'))
+	// Output: /path\/esc
+}
+
+func TestURLPathWithEscape(t *testing.T) {
+	tests := []struct{ raw, want string }{
+		{"", ""},
+		{"/", "/"},
+		{"//", "//"},
+		{"/foo", "/foo"},
+		{"/%66oo", "/foo"},
+		{"/f%6Fo", "/foo"},
+		{"/fo%6F", "/foo"},
+		{"/%66%6F%6F", "/foo"},
+		{"/foo/", "/foo/"},
+
+		{"%2F", `\/`},
+		{"%2F%2F", `\/\/`},
+		{"%2Ffoo", `\/foo`},
+		{"/foo%2F", `/foo\/`},
+		{"%2F%66%6F%6F%2F", `\/foo\/`},
+
+		{"%5C", `\\`},
+		{"/%5C", `/\\`},
+		{"%5C/", `\\/`},
+
+		// broken encodings
+		{"/mis1%1", "/mis1%1"},
+		{"/mis2%", "/mis2%"},
+		{"%fF%Ff", "%fF%Ff"},
+	}
+
+	for _, test := range tests {
+		u := did.URL{RawPath: test.raw}
+		got := u.PathWithEscape('\\')
+		if got != test.want {
+			t.Errorf("raw path %q got %q, want %q", test.raw, got, test.want)
+		}
+	}
+}
+
+func FuzzURLPathWithEscape(f *testing.F) {
+	f.Add("-", byte('-'))
+	f.Add("%2F", byte('\\'))
+	f.Add("%", byte('1'))
+	f.Fuzz(func(t *testing.T, rawPath string, escape byte) {
+		u := did.URL{RawPath: rawPath}
+		u.PathWithEscape(escape)
+		// should simply not crash
+	})
+}
+
 func TestURLVersionParams(t *testing.T) {
 	t.Run("ID", func(t *testing.T) {
 		sample := example3

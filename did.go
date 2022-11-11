@@ -567,6 +567,98 @@ func (u *URL) String() string {
 	return u.GoURL().String()
 }
 
+// PathWithEscape returns the RawPath with any and all of its percent-encodings
+// resolved. Malformed and/or incomplete percent-encodings are returned as is.
+//
+// Encoded path-separators ("%2F") are replaced by the escape character followed
+// by the path-separator character ('/'). Escape-character occurrences are
+// replaced by two sequential escape characters. Percent-encodings that resolve
+// to the escape character get replaced by two sequential escape characters.
+func (u *URL) PathWithEscape(escape byte) string {
+	s := u.RawPath
+	i := 0
+	for {
+		if i >= len(s) {
+			return s // fast path
+		}
+
+		if s[i] == escape || s[i] == '%' {
+			break
+		}
+
+		i++
+	}
+
+	var b strings.Builder
+	b.WriteString(s[:i])
+
+	for i < len(s) {
+		switch s[i] {
+		default:
+			b.WriteByte(s[i])
+			i++
+		case escape:
+			b.WriteByte(escape)
+			b.WriteByte(escape)
+			i++
+		case '%':
+			if i+2 >= len(s) {
+				// incomplete percent-encoding
+				b.WriteByte(s[i])
+				i++
+				continue
+			}
+
+			var v byte
+
+			// decode first nibble
+			switch c := s[i+1]; c {
+			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+				v = c - '0'
+			case 'A', 'B', 'C', 'D', 'E', 'F':
+				v = c - 'A' + 10
+			default:
+				// illegal character
+				b.WriteByte(s[i])
+				i++
+				continue
+			}
+
+			v <<= 4
+
+			// decode second nibble
+			switch c := s[i+2]; c {
+			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+				v |= c - '0'
+			case 'A', 'B', 'C', 'D', 'E', 'F':
+				v |= c - 'A' + 10
+			default:
+				// illegal character
+				b.WriteByte(s[i])
+				i++
+				b.WriteByte(s[i])
+				i++
+				continue
+			}
+
+			switch v {
+			default:
+				b.WriteByte(v)
+			case escape:
+				b.WriteByte(escape)
+				b.WriteByte(escape)
+			case '/':
+				b.WriteByte(escape)
+				b.WriteByte('/')
+			}
+
+			i += 3
+		}
+	}
+
+	return b.String()
+}
+
 var (
 	errVersionIDDupe   = errors.New("duplicate versionId in DID URL")
 	errVersionTimeDupe = errors.New("duplicate versionTime in DID URL")
