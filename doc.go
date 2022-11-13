@@ -19,8 +19,9 @@ const JSON = "application/did+json"
 
 // Doc holds the “core properties” of a DID document. Only Subject is required.
 type Doc struct {
-	Subject     DID `json:"id"`
-	Controllers Set `json:"controller,omitempty"`
+	Subject     DID      `json:"id"`
+	AlsoKnownAs []string `json:"alsoKnownAs,omitempty"`
+	Controllers Set      `json:"controller,omitempty"`
 
 	// A DID document can express verification methods, such as
 	// cryptographic public keys, which can be used to authenticate or
