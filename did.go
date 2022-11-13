@@ -1,4 +1,5 @@
-// Package did implements W3C's Decentralized Identifiers.
+// Package did fully implements W3C's Decentralised Identifier (DID) standard.
+// See https://www.w3.org/TR/did-core/ for the specification.
 package did
 
 import (
@@ -14,12 +15,16 @@ const prefix = "did:" // URI scheme selection
 
 // DID contains the variable attributes.
 type DID struct {
-	// Method names the applicable scheme of the DID. The token value must
+	// Method names the applicable scheme of the DID. The token value MUST
 	// consist of lower-case letters 'a'–'z' and/or decimals '0'–'9' only.
+	//
+	// Use constants when setting this property to prevent malformed DID
+	// production (with String). Instances returned by the parse methods
+	// always contain a valid method.
 	Method string
 
-	// Method-specific identifiers may result into escaped characters with
-	// one or more percent-encodings.
+	// Method-specific identifiers may or may not contain a valid UTF-8
+	// sequence. The W3C standard puts no constaints on the (byte) content.
 	SpecID string
 }
 
@@ -67,8 +72,8 @@ func (e SyntaxError) Unwrap() error {
 	return e.Err
 }
 
-// Parse validates s in full, and it returns the mapping. If there is an error,
-// it will be of type *SyntaxError.
+// Parse validates s in full. It returns the mapping if, and only if s conforms
+// to the DID syntax specification. Errors will be of type *SyntaxError.
 func Parse(s string) (DID, error) {
 	method, err := parseMethodName(s)
 	if err != nil {
@@ -362,8 +367,9 @@ type URL struct {
 	Fragment string     // optional
 }
 
-// ParseURL validates s in full, and it returns the mapping. If there is an
-// error, it will be of type *SyntaxError.
+// ParseURL validates s in full. It returns the mapping if, and only if s
+// conforms to the DID URL syntax specification. Errors will be of type
+// *SyntaxError.
 func ParseURL(s string) (*URL, error) {
 	method, err := parseMethodName(s)
 	if err != nil {

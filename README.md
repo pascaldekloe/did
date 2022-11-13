@@ -3,7 +3,9 @@
 
 ## About
 
-… a W3C Decentralised Identifier (DID) library for the Go programming language.
+Package did fully implements W3C's Decentralised Identifier (DID)
+[standard](https://www.w3.org/TR/did-core/). The methods are designed to prevent
+common pitfalls.
 
 This is free and unencumbered software released into the
 [public domain](https://creativecommons.org/publicdomain/zero/1.0).
