@@ -11,15 +11,16 @@ import (
 	"strconv"
 )
 
-// V1 is the namespace URI.
+// V1 is the (W3C) namespace URI.
 const V1 = "https://www.w3.org/ns/did/v1"
 
-// JSON is the media type for JSON document production and consumption.
+// JSON is the (MIME) media type for JSON document production and consumption.
 const JSON = "application/did+json"
 
-// Doc holds the “core properties” of a DID document. Only Subject is required.
-type Doc struct {
-	Subject     DID      `json:"id"`
+// Document holds the “core properties” of a DID association [Subject].
+type Document struct {
+	Subject DID `json:"id"` // required
+
 	AlsoKnownAs []string `json:"alsoKnownAs,omitempty"`
 	Controllers Set      `json:"controller,omitempty"`
 
@@ -110,9 +111,9 @@ func (set *Set) UnmarshalJSON(bytes []byte) error {
 	}
 }
 
-// VerificationRelationship expresses the relationship between the Doc Subject
-// and a VerificationMethod. Each verification method MAY be either embedded or
-// referenced.
+// VerificationRelationship expresses the relationship between the Document
+// Subject and a VerificationMethod. Each verification method MAY be either
+// embedded or referenced.
 type VerificationRelationship struct {
 	Methods []*VerificationMethod // embedded
 	URIRefs []string              // referenced
@@ -190,7 +191,7 @@ func (r *VerificationRelationship) UnmarshalJSON(bytes []byte) error {
 }
 
 // EmbeddedVerificationMethods compiles a snapshot with all available methods.
-func (doc *Doc) EmbeddedVerificationMethods() (*EmbeddedVerificationMethods, error) {
+func (doc *Document) EmbeddedVerificationMethods() (*EmbeddedVerificationMethods, error) {
 	relationships := [...]*VerificationRelationship{
 		doc.Authentication,
 		doc.AssertionMethod,
@@ -238,10 +239,10 @@ func (doc *Doc) EmbeddedVerificationMethods() (*EmbeddedVerificationMethods, err
 }
 
 // EmbeddedVerificationMethods holds a snapshot of all embedded entries in any
-// of the “core properties” from a DID document. Any changes to the Doc will not
-// be reflected in here.
+// of the “core properties” from a DID Document. Any changes to the Document
+// will not be reflected.
 type EmbeddedVerificationMethods struct {
-	Doc *Doc
+	Doc *Document // subject
 	// PerID holds the mapping for a document.
 	PerID map[string]*VerificationMethod
 }

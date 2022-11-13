@@ -18,14 +18,15 @@ var (
 	ErrMediaType = errors.New("DID document media type not supported")
 )
 
-// Resolve a DID into a Doc by using the “Read” operation of the DID.Method.
+// Resolve a DID into a Document by using the “Read” operation of the DID
+// Method.
 //
 // Implementations should return a SyntaxError when encountering an "invalidDid"
 // error code, or ErrNotFound on the "notFound" code, or ErrMediaType on the
 // "representationNotSupported" code.
-type Resolve func(DID) (*Doc, *Meta, error)
+type Resolve func(DID) (*Document, *Meta, error)
 
-// Meta describes a Doc. Note that all properties are optional.
+// Meta describes a Document. Note that all properties are optional.
 type Meta struct {
 	Created       time.Time `json:"created,omitempty"`
 	Updated       time.Time `json:"updated,omitempty"`
