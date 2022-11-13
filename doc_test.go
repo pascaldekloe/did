@@ -179,7 +179,7 @@ const example31 = `{
 }`
 
 func TestDocSubjectJSON(t *testing.T) {
-	var doc did.Doc
+	var doc did.Document
 	err := json.Unmarshal([]byte(example10), &doc)
 	if err != nil {
 		t.Fatal(err)
@@ -192,7 +192,7 @@ func TestDocSubjectJSON(t *testing.T) {
 }
 
 func TestDocControllersJSON(t *testing.T) {
-	var doc did.Doc
+	var doc did.Document
 	err := json.Unmarshal([]byte(example11), &doc)
 	if err != nil {
 		t.Fatal(err)
@@ -205,7 +205,7 @@ func TestDocControllersJSON(t *testing.T) {
 }
 
 func TestVerificationRelationshipUnmarshalJSON(t *testing.T) {
-	var doc did.Doc
+	var doc did.Document
 	err := json.Unmarshal([]byte(example15), &doc)
 	if err != nil {
 		t.Fatal(err)
@@ -231,7 +231,7 @@ func TestVerificationRelationshipUnmarshalJSON(t *testing.T) {
 }
 
 func TestEmbeddedVerificationMethods(t *testing.T) {
-	var doc did.Doc
+	var doc did.Document
 	err := json.Unmarshal([]byte(example31), &doc)
 	if err != nil {
 		t.Fatal(err)
@@ -250,7 +250,7 @@ func TestEmbeddedVerificationMethods(t *testing.T) {
 }
 
 func TestEmbeddedVerificationMethods_relationships(t *testing.T) {
-	var doc did.Doc
+	var doc did.Document
 	err := json.Unmarshal([]byte(example30), &doc)
 	if err != nil {
 		t.Fatal(err)

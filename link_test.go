@@ -75,7 +75,7 @@ func TestVerificationMethodMarshalJSON(t *testing.T) {
 		t.Fatal("sample preparation:", err)
 	}
 
-	doc := did.Doc{Subject: did.DID{Method: "example", SpecID: "123456789abcdefghi"}}
+	doc := did.Document{Subject: did.DID{Method: "example", SpecID: "123456789abcdefghi"}}
 	doc.VerificationMethods = []*did.VerificationMethod{
 		{
 			ID: did.URL{
@@ -117,7 +117,7 @@ func TestVerificationMethodMarshalJSON(t *testing.T) {
 }
 
 func ExampleVerificationMethod_jSON() {
-	var doc did.Doc
+	var doc did.Document
 	err := json.Unmarshal([]byte(example12), &doc)
 	if err != nil {
 		fmt.Println(err)
