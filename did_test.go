@@ -121,6 +121,7 @@ func ExampleDIDResolve() {
 		"any?",
 		"#body",
 		"did:example:*",
+		"did:foo:bar",
 		"http://localhost:8080",
 	}
 
@@ -137,6 +138,7 @@ func ExampleDIDResolve() {
 	// • did:example:101/any
 	// • did:example:101#body
 	// • did:example:*
+	// • did:foo:bar
 	// • http://localhost:8080
 }
 
