@@ -184,15 +184,13 @@ NoEscapes:
 			// decode first nibble
 			switch c := s[i+1]; c {
 			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-				v = c - '0'
+				v = (c - '0') << 4
 			case 'A', 'B', 'C', 'D', 'E', 'F':
-				v = c - 'A' + 10
+				v = (c - 'A' + 10) << 4
 			default:
 				// illegal character
 				return "", i
 			}
-
-			v <<= 4
 
 			// decode second nibble
 			switch c := s[i+2]; c {
@@ -496,13 +494,12 @@ func pathEqual(s string, u *url.URL) bool {
 func hexvalOrZero(a, b byte) (v byte) {
 	switch a {
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-		v = a - '0'
+		v = (a - '0') << 4
 	case 'A', 'B', 'C', 'D', 'E', 'F':
-		v = a - 'A' + 10
+		v = (a - 'A' + 10) << 4
 	default:
 		return 0
 	}
-	v <<= 4
 
 	switch b {
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
@@ -614,17 +611,15 @@ func (u *URL) PathWithEscape(escape byte) string {
 			// decode first nibble
 			switch c := s[i+1]; c {
 			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-				v = c - '0'
+				v = (c - '0') << 4
 			case 'A', 'B', 'C', 'D', 'E', 'F':
-				v = c - 'A' + 10
+				v = (c - 'A' + 10) << 4
 			default:
 				// illegal character
 				b.WriteByte(s[i])
 				i++
 				continue
 			}
-
-			v <<= 4
 
 			// decode second nibble
 			switch c := s[i+2]; c {
@@ -657,6 +652,107 @@ func (u *URL) PathWithEscape(escape byte) string {
 	}
 
 	return b.String()
+}
+
+// PathSegments returns each component from the path in a foolproof manner.
+// Percent-encodings get resolved on best-effort basis. Malformed encodings
+// simply pass as is. The return is guaranteed to be equal to any and all
+// arguments passed to SetPathSegments.
+func (u *URL) PathSegments() []string {
+	if u.RawPath == "" {
+		return nil
+	}
+
+	s := strings.TrimPrefix(u.RawPath, "/")
+	segs := make([]string, 0, strings.Count(s, "/"))
+
+	// apply each directory
+	for {
+		i := strings.IndexByte(s, '/')
+		if i < 0 {
+			break
+		}
+		segs = append(segs, pathUnescape(s[:i]))
+		s = s[i+1:]
+	}
+
+	// apply the last segment
+	if s != "" {
+		segs = append(segs, pathUnescape(s))
+	}
+
+	return segs
+}
+
+// PathUnescape resolves percent-encoding on best-effort basis.
+// Malformend encodings are passed as is.
+func pathUnescape(s string) string {
+	i := strings.IndexByte(s, '%')
+	if i < 0 {
+		return s // fast path
+	}
+
+	var b strings.Builder
+	for ; i >= 0; i = strings.IndexByte(s, '%') {
+		if i+2 >= len(s) {
+			break // incomplete percent-encoding
+		}
+		b.WriteString(s[:i])
+
+		var v byte
+
+		// decode first nibble
+		switch c := s[i+1]; c {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			v = (c - '0') << 4
+		case 'A', 'B', 'C', 'D', 'E', 'F':
+			v = (c - 'A' + 10) << 4
+		default:
+			// illegal character; pass '%'
+			b.WriteByte('%')
+			s = s[i+1:]
+			continue // re-evaluate digit positions
+		}
+
+		// decode second nibble
+		switch c := s[i+2]; c {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			v |= c - '0'
+		case 'A', 'B', 'C', 'D', 'E', 'F':
+			v |= c - 'A' + 10
+		default:
+			// illegal character; pass '%' + first hex
+			b.WriteByte('%')
+			b.WriteByte(s[i+1])
+			s = s[i+2:]
+			continue // re-evaluate second digit position
+		}
+
+		b.WriteByte(v)
+		s = s[i+3:] // pass percent-encoding
+	}
+	b.WriteString(s)
+	return b.String()
+}
+
+// SetPathSegments updates the path in a foolproof manner. Unsafe characters are
+// replaced by their percent-encodings. The return of PathSegments is guaranteed
+// to be equal to any and all arguments passed to SetPathSegments.
+func (u *URL) SetPathSegments(segs ...string) {
+	if len(segs) == 0 {
+		u.RawPath = ""
+		return
+	}
+
+	var b strings.Builder
+	for _, s := range segs {
+		b.WriteByte('/')
+		b.WriteString(url.PathEscape(s))
+	}
+	if segs[len(segs)-1] == "" {
+		b.WriteByte('/')
+	}
+	u.RawPath = b.String()
 }
 
 var (

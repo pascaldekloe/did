@@ -345,6 +345,70 @@ func FuzzURLPathWithEscape(f *testing.F) {
 	})
 }
 
+func ExampleURL_PathSegments() {
+	u := did.URL{RawPath: "/plain/and%2For/escaped%20%E2%9C%A8"}
+	fmt.Printf("segmented: %q\n", u.PathSegments())
+	// Output: segmented: ["plain" "and/or" "escaped ✨"]
+}
+
+func ExampleURL_SetPathSegments() {
+	var u did.URL
+	u.SetPathSegments("plain", "and/or", "escaped ✨")
+	fmt.Printf("raw path: %q\n", u.RawPath)
+	// Output: raw path: "/plain/and%2For/escaped%20%E2%9C%A8"
+}
+
+func TestURLPathSegments(t *testing.T) {
+	tests := []struct {
+		rawPath string
+		want    []string
+	}{
+		{"", nil},
+		{"/", []string{}},
+		{"//", []string{""}},
+		{"/a", []string{"a"}},
+		{"/a/", []string{"a"}},
+		{"/a//", []string{"a", ""}},
+		{"//b/", []string{"", "b"}},
+		{"///", []string{"", ""}},
+	}
+	for _, test := range tests {
+		got := (&did.URL{RawPath: test.rawPath}).PathSegments()
+		if !reflect.DeepEqual(got, test.want) {
+			t.Errorf("raw path %q got %q, want %q", test.rawPath, got, test.want)
+		}
+	}
+}
+
+// FuzzURLSetPathSegments validates the SetPathSegments–GetPathSegments round-
+// trip for losslessness.
+func FuzzURLSetPathSegments(f *testing.F) {
+	// Fuzz does not support []string yet
+	f.Add("", "/", "")
+	f.Fuzz(func(t *testing.T, a, b, c string) {
+		testURLSetPathSegments(t, a)
+		testURLSetPathSegments(t, a, b)
+		testURLSetPathSegments(t, a, b, c)
+	})
+}
+
+func testURLSetPathSegments(t *testing.T, segs ...string) {
+	var u did.URL
+	u.SetPathSegments(segs...)
+	got := u.PathSegments()
+	if len(got) != len(segs) {
+		t.Logf("set segments %q got raw path %q", segs, u.RawPath)
+		t.Errorf("got %d segments %q, want %d %q", len(got), got, len(segs), segs)
+		return
+	}
+	for i, s := range segs {
+		if s != got[i] {
+			t.Logf("set segments %q got raw path %q", segs, u.RawPath)
+			t.Errorf("segment № %d got %q, want %q", i, got[i], s)
+		}
+	}
+}
+
 func TestURLVersionParams(t *testing.T) {
 	t.Run("ID", func(t *testing.T) {
 		sample := example3
