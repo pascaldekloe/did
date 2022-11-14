@@ -75,7 +75,7 @@ func (e SyntaxError) Unwrap() error {
 // Parse validates s in full. It returns the mapping if, and only if s conforms
 // to the DID syntax specification. Errors will be of type *SyntaxError.
 func Parse(s string) (DID, error) {
-	method, err := parseMethodName(s)
+	method, err := readMethodName(s)
 	if err != nil {
 		return DID{}, err
 	}
@@ -86,7 +86,7 @@ func Parse(s string) (DID, error) {
 	return DID{Method: method, SpecID: specID}, nil
 }
 
-func parseMethodName(s string) (string, error) {
+func readMethodName(s string) (string, error) {
 	for i := range prefix {
 		if i >= len(s) {
 			return "", &SyntaxError{S: s, I: i}
@@ -180,34 +180,10 @@ NoEscapes:
 			i++
 
 		case '%':
-			if i+2 >= len(s) {
-				return "", i
+			v, err := parseHex(s, i+1)
+			if err != nil {
+				return "", err.(*SyntaxError).I
 			}
-
-			var v byte
-
-			// decode first nibble
-			switch c := s[i+1]; c {
-			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-				v = (c - '0') << 4
-			case 'A', 'B', 'C', 'D', 'E', 'F':
-				v = (c - 'A' + 10) << 4
-			default:
-				// illegal character
-				return "", i
-			}
-
-			// decode second nibble
-			switch c := s[i+2]; c {
-			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-				v |= c - '0'
-			case 'A', 'B', 'C', 'D', 'E', 'F':
-				v |= c - 'A' + 10
-			default:
-				// illegal character
-				return "", i
-			}
-
 			b.WriteByte(v)
 			i += 3
 
@@ -227,13 +203,13 @@ func (d DID) Equal(s string) bool {
 	if len(s) < len(prefix) || s[:len(prefix)] != prefix {
 		return false
 	}
-	s = s[len(prefix):]
+	s = s[len(prefix):] // pass
 
 	// method compare
 	if l := len(d.Method); l >= len(s) || s[l] != ':' || s[:l] != d.Method {
 		return false
 	}
-	s = s[len(d.Method)+1:]
+	s = s[len(d.Method)+1:] // pass
 
 	// method-specific identifier compare includes percent-encoding
 	for i := 0; i < len(d.SpecID); i++ {
@@ -249,13 +225,14 @@ func (d DID) Equal(s string) bool {
 			if s[0] != c {
 				return false
 			}
-			s = s[1:] // next byte
+			s = s[1:] // pass
 
 		case '%':
-			if len(s) < 3 || hexvalOrZero(s[1], s[2]) != c {
+			v, err := parseHex(s, 1)
+			if err != nil || v != c {
 				return false
 			}
-			s = s[3:] // next byte
+			s = s[3:] // pass
 
 		default:
 			return false // invalid
@@ -287,8 +264,6 @@ func (base DID) Resolve(s string) (string, error) {
 
 	return u.String(), nil
 }
-
-var hexChars = [16]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'}
 
 // String returns the DID syntax.
 func (d DID) String() string {
@@ -330,8 +305,8 @@ func (d DID) String() string {
 
 		default:
 			b.WriteByte('%')
-			b.WriteByte(hexChars[c>>4])
-			b.WriteByte(hexChars[c&15])
+			b.WriteByte(hexTable[c>>4])
+			b.WriteByte(hexTable[c&15])
 		}
 	}
 	return b.String()
@@ -370,7 +345,7 @@ type URL struct {
 // conforms to the DID URL syntax specification. Errors will be of type
 // *SyntaxError.
 func ParseURL(s string) (*URL, error) {
-	method, err := parseMethodName(s)
+	method, err := readMethodName(s)
 	if err != nil {
 		return nil, err
 	}
@@ -395,19 +370,13 @@ func ParseURL(s string) (*URL, error) {
 
 	case '/':
 		offset := end
-	PathRead:
-		for {
-			end++
-			if end >= len(s) {
-				u.RawPath = s[offset:]
-				return &u, nil
-			}
-			// BUG(pascaldekloe): ParseURL does not validate the path.
-			switch s[end] {
-			case '#', '?':
-				u.RawPath = s[offset:end]
-				break PathRead
-			}
+		u.RawPath, err = readPath(s, offset)
+		if err != nil {
+			return nil, err
+		}
+		end += len(u.RawPath)
+		if end >= len(s) {
+			return &u, nil
 		}
 	}
 	// got URL fragment and/or query in s[end:]
@@ -421,6 +390,38 @@ func ParseURL(s string) (*URL, error) {
 		u.Query = p.Query()
 	}
 	return &u, nil
+}
+
+func readPath(s string, offset int) (string, error) {
+	for i := offset; i < len(s); i++ {
+		switch s[i] {
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+			'-', '.', '_', '~', // unreserved
+			'!', '$', '&', '\'', '(', ')', '*', '+', ',', ';', '=', // sub-delims
+			':', '@': // path specific
+			continue // valid
+
+		case '#', '?':
+			// “The path is terminated by the first question mark
+			// ("?") or number sign ("#") character, or by the end
+			// of the URI.”
+			// — “URI: Generic Syntax” RFC 3986, subsection 3.3
+			return s[offset:i], nil
+
+		case '%':
+			_, err := parseHex(s, i+1)
+			if err != nil {
+				return "", err
+			}
+			i += 2
+		}
+	}
+
+	return s[offset:], nil
 }
 
 // Equal returns whether s compares equal to u. The method is compliant with the
@@ -475,44 +476,35 @@ func pathEqual(s string, u *url.URL) bool {
 			return t == ""
 		case t == "":
 			return false
+		}
 
-		case s[0] == t[0]:
+		sc := s[0]
+		if sc != '%' {
 			s = s[1:]
-			t = t[1:]
-
-		case s[0] == '/', t[0] == '/':
-			return false
-
-		case s[0] == '%' && len(s) > 2 && t[0] == hexvalOrZero(s[1], s[2]):
+		} else {
+			var err error
+			sc, err = parseHex(s, 1)
+			if err != nil {
+				return false
+			}
 			s = s[3:]
-			t = t[1:]
-		case t[0] == '%' && len(t) > 2 && s[0] == hexvalOrZero(t[1], t[2]):
-			s = s[1:]
-			t = t[3:]
+		}
 
-		default:
+		tc := t[0]
+		if tc != '%' {
+			t = t[1:]
+		} else {
+			var err error
+			tc, err = parseHex(t, 1)
+			if err != nil {
+				return false
+			}
+			t = t[3:]
+		}
+
+		if sc != tc {
 			return false
 		}
-	}
-}
-
-func hexvalOrZero(a, b byte) (v byte) {
-	switch a {
-	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-		v = (a - '0') << 4
-	case 'A', 'B', 'C', 'D', 'E', 'F':
-		v = (a - 'A' + 10) << 4
-	default:
-		return 0
-	}
-
-	switch b {
-	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-		return v | (b - '0')
-	case 'A', 'B', 'C', 'D', 'E', 'F':
-		return v | (b - 'A' + 10)
-	default:
-		return 0
 	}
 }
 
@@ -699,42 +691,16 @@ func pathUnescape(s string) string {
 
 	var b strings.Builder
 	for ; i >= 0; i = strings.IndexByte(s, '%') {
-		if i+2 >= len(s) {
-			break // incomplete percent-encoding
-		}
-		b.WriteString(s[:i])
-
-		var v byte
-
-		// decode first nibble
-		switch c := s[i+1]; c {
-		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-			v = (c - '0') << 4
-		case 'A', 'B', 'C', 'D', 'E', 'F':
-			v = (c - 'A' + 10) << 4
-		default:
-			// illegal character; pass '%'
-			b.WriteByte('%')
-			s = s[i+1:]
-			continue // re-evaluate digit positions
+		v, err := parseHex(s, i+1)
+		if err != nil {
+			b.WriteString(s[:i+1]) // all including the '%'
+			s = s[i+1:]            // pass '%'
+			continue
 		}
 
-		// decode second nibble
-		switch c := s[i+2]; c {
-		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-			v |= c - '0'
-		case 'A', 'B', 'C', 'D', 'E', 'F':
-			v |= c - 'A' + 10
-		default:
-			// illegal character; pass '%' + first hex
-			b.WriteByte('%')
-			b.WriteByte(s[i+1])
-			s = s[i+2:]
-			continue // re-evaluate second digit position
-		}
-
-		b.WriteByte(v)
-		s = s[i+3:] // pass percent-encoding
+		b.WriteString(s[:i]) // all before the '%'
+		b.WriteByte(v)       // escaped value
+		s = s[i+3:]          // pass '%' and both hex digits
 	}
 	b.WriteString(s)
 	return b.String()
@@ -821,4 +787,47 @@ func (u *URL) UnmarshalJSON(bytes []byte) error {
 	}
 	*u = *p // copy
 	return nil
+}
+
+// HexTable maps a nibble to its encoded value.
+//
+// “For consistency, URI producers and normalizers should use uppercase
+// hexadecimal digits for all percent-encodings.”
+// — “URI: Generic Syntax” RFC 3986, subsection 2.1
+var hexTable = [16]byte{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'}
+
+// ParseHex returns the interpretation of two hex digits, starting at index i.
+func parseHex(s string, i int) (byte, error) {
+	var v byte
+
+	if i >= len(s) {
+		return 0, &SyntaxError{S: s, I: i}
+	}
+	switch c := s[i]; c {
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		v = c - '0'
+	case 'A', 'B', 'C', 'D', 'E', 'F':
+		v = c - 'A' + 10
+	case 'a', 'b', 'c', 'd', 'e', 'f':
+		v = c - 'a' + 10
+	default:
+		return 0, &SyntaxError{S: s, I: i}
+	}
+	v <<= 4
+
+	i++
+	if i >= len(s) {
+		return 0, &SyntaxError{S: s, I: i}
+	}
+	switch c := s[i]; c {
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		v |= c - '0'
+	case 'A', 'B', 'C', 'D', 'E', 'F':
+		v |= c - 'A' + 10
+	case 'a', 'b', 'c', 'd', 'e', 'f':
+		v |= c - 'a' + 10
+	default:
+		return 0, &SyntaxError{S: s, I: i}
+	}
+	return v, nil
 }

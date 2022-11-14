@@ -34,7 +34,7 @@ func ExampleParse_percentEncoding() {
 
 func FuzzParse(f *testing.F) {
 	f.Add("did:a:b")
-	f.Add("did:1:2%34")
+	f.Add("did:cd:%01%eF")
 	f.Fuzz(func(t *testing.T, s string) {
 		_, err := did.Parse(s)
 		switch e := err.(type) {
@@ -87,6 +87,12 @@ var DIDEquals = [][]string{
 	{
 		"did:tricky:%3Afoo%2F",
 		"did:tricky:%3A%66%6F%6F%2F",
+	},
+	{
+		// binary value
+		"did:sha256:%e3%b0%c4%42%98%fc%1c%14%9a%fb%f4%c8%99%6f%b9%24%27%ae%41%e4%64%9b%93%4c%a4%95%99%1b%78%52%b8%55",
+		// upper- and lower-case mix
+		"did:sha256:%E3%b0%c4%42%98%Fc%1c%14%9a%fB%f4%c8%99%6f%b9%24%27%ae%41%e4%64%9b%93%4c%a4%95%99%1b%78%52%b8%55",
 	},
 }
 
@@ -244,6 +250,12 @@ var SelectEquals = [][]string{
 		"#%65scaped%F0%9F%A4%96",
 		"#escap%65d%F0%9F%A4%96",
 	},
+	{
+		"/%ee#%ff",
+		"/%eE#%fF",
+		"/%Ee#%FF",
+		"/%EE#%FF",
+	},
 }
 
 var URLEquals = func() [][]string {
@@ -373,6 +385,8 @@ func TestURLPathSegments(t *testing.T) {
 		{"/a//", []string{"a", ""}},
 		{"//b/", []string{"", "b"}},
 		{"///", []string{"", ""}},
+		{"/%AB/%ba/", []string{"\xab", "\xba"}},
+		{"/%cD/%Dc/", []string{"\xcd", "\xdc"}},
 	}
 	for _, test := range tests {
 		got := (&did.URL{RawPath: test.rawPath}).PathSegments()
