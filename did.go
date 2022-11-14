@@ -284,7 +284,6 @@ func (base DID) Resolve(s string) (string, error) {
 	if p.RawPath != "" {
 		u.RawPath = p.RawPath
 	}
-	// BUG(pascaldekloe): Resolve does no apply percent encoding on RawPath yet.
 
 	return u.String(), nil
 }
