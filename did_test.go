@@ -50,6 +50,32 @@ func FuzzParse(f *testing.F) {
 	})
 }
 
+var GoldenDIDs = []struct {
+	S string
+	did.DID
+}{
+	{
+		"did:foo:bar",
+		did.DID{Method: "foo", SpecID: "bar"},
+	}, {
+		"did:c:str%00",
+		did.DID{Method: "c", SpecID: "str\x00"},
+	},
+}
+
+func TestDIDString(t *testing.T) {
+	for _, gold := range GoldenDIDs {
+		n := testing.AllocsPerRun(1, func() {
+			if got := gold.DID.String(); got != gold.S {
+				t.Errorf("got %q, want %q", got, gold.S)
+			}
+		})
+		if n != 1 {
+			t.Errorf("%s did %f memory allocations, want 1", gold.S, n)
+		}
+	}
+}
+
 func FuzzDIDString(f *testing.F) {
 	f.Add("a", "b")
 	f.Add("1", "2%3")

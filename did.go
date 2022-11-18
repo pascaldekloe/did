@@ -267,34 +267,33 @@ func (base DID) Resolve(s string) (string, error) {
 
 // String returns the DID syntax.
 func (d DID) String() string {
-	i := 0
-	for {
-		if i >= len(d.SpecID) {
-			return prefix + d.Method + ":" + d.SpecID
-		}
-
+	var escapeN int
+	for i := 0; i < len(d.SpecID); i++ {
 		switch d.SpecID[i] {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z':
-			i++ // next
-			continue
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+			'.', '-', '_':
+			continue // valid
+		default:
+			escapeN++
 		}
-
-		break
 	}
-	// needs percent-encoding
+
+	if escapeN == 0 {
+		return prefix + d.Method + ":" + d.SpecID
+	}
 
 	var b strings.Builder
-	// every byte-escape produces three bytes
-	b.Grow(20 + len(d.Method) + len(d.SpecID))
+	b.Grow(len(prefix) + len(d.Method) + 1 + len(d.SpecID) + 2*escapeN)
 	b.WriteString(prefix)
 	b.WriteString(d.Method)
 	b.WriteByte(':')
-	b.WriteString(d.SpecID[:i])
 
-	for s := d.SpecID; i < len(s); i++ {
-		switch c := s[i]; c {
+	for i := 0; i < len(d.SpecID); i++ {
+		switch c := d.SpecID[i]; c {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
 			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
