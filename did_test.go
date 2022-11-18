@@ -10,13 +10,33 @@ import (
 	"github.com/pascaldekloe/did"
 )
 
+// Example2 is borrowed from the W3C.
+// https://www.w3.org/TR/did-core/#example-2
+const example2 = "did:example:123456/path"
+
 // Example3 is borrowed from the W3C.
 // https://www.w3.org/TR/did-core/#example-3
-var example3 = "did:example:123456?versionId=1"
+const example3 = "did:example:123456?versionId=1"
+
+// Example4 is borrowed from the W3C.
+// https://www.w3.org/TR/did-core/#example-a-unique-verification-method-in-a-did-document
+const example4 = "did:example:123#public-key-0"
+
+// Example5 is borrowed from the W3C.
+// https://www.w3.org/TR/did-core/#example-a-unique-service-in-a-did-document
+const example5 = "did:example:123#agent"
+
+// Example6 is borrowed from the W3C.
+// https://www.w3.org/TR/did-core/#example-a-resource-external-to-a-did-document
+const example6 = "did:example:123?service=agent&relativeRef=/credentials#degree"
 
 // Example7 is borrowed from the W3C.
 // https://www.w3.org/TR/did-core/#example-a-did-url-with-a-versiontime-did-parameter
-var example7 = "did:example:123?versionTime=2021-05-10T17:00:00Z"
+const example7 = "did:example:123?versionTime=2021-05-10T17:00:00Z"
+
+// Example8 is borrowed from the W3C.
+// https://www.w3.org/TR/did-core/#example-a-did-url-with-a-service-and-a-relativeref-did-parameter
+const example8 = "did:example:123?service=files&relativeRef=/resume.pdf"
 
 func ExampleParse_percentEncoding() {
 	d, err := did.Parse("did:example:escaped%F0%9F%A4%96")
@@ -174,92 +194,112 @@ func ExampleDIDResolve() {
 	// • http://localhost:8080
 }
 
-var GoldenURLs = map[string]did.URL{
-	"did:example:123456789abcdefghi": {
-		DID: did.DID{
-			Method: "example",
-			SpecID: "123456789abcdefghi",
+var GoldenURLs = []struct {
+	S string
+	did.URL
+}{
+	{
+		"did:example:123456789abcdefghi",
+		did.URL{
+			DID: did.DID{
+				Method: "example",
+				SpecID: "123456789abcdefghi",
+			},
 		},
-	},
-	"did:example:123456/path": {
-		DID: did.DID{
-			Method: "example",
-			SpecID: "123456",
+	}, {
+		example2,
+		did.URL{
+			DID: did.DID{
+				Method: "example",
+				SpecID: "123456",
+			},
+			RawPath: "/path",
 		},
-		RawPath: "/path",
-	},
-	example3: {
-		DID: did.DID{
-			Method: "example",
-			SpecID: "123456",
+	}, {
+		example3,
+		did.URL{
+			DID: did.DID{
+				Method: "example",
+				SpecID: "123456",
+			},
+			Query: url.Values{"versionId": []string{"1"}},
 		},
-		Query: url.Values{"versionId": []string{"1"}},
-	},
-	"did:example:123#public-key-0": {
-		DID: did.DID{
-			Method: "example",
-			SpecID: "123",
+	}, {
+		example4,
+		did.URL{
+			DID: did.DID{
+				Method: "example",
+				SpecID: "123",
+			},
+			Fragment: "public-key-0",
 		},
-		Fragment: "public-key-0",
-	},
-	"did:example:123#agent": {
-		DID: did.DID{
-			Method: "example",
-			SpecID: "123",
+	}, {
+		example5,
+		did.URL{
+			DID: did.DID{
+				Method: "example",
+				SpecID: "123",
+			},
+			Fragment: "agent",
 		},
-		Fragment: "agent",
-	},
-	"did:example:123?service=agent&relativeRef=/credentials#degree": {
-		DID: did.DID{
-			Method: "example",
-			SpecID: "123",
+	}, {
+		example6,
+		did.URL{
+			DID: did.DID{
+				Method: "example",
+				SpecID: "123",
+			},
+			Query: url.Values{
+				"service":     []string{"agent"},
+				"relativeRef": []string{"/credentials"},
+			},
+			Fragment: "degree",
 		},
-		Query: url.Values{
-			"service":     []string{"agent"},
-			"relativeRef": []string{"/credentials"},
+	}, {
+		example7,
+		did.URL{
+			DID: did.DID{
+				Method: "example",
+				SpecID: "123",
+			},
+			Query: url.Values{"versionTime": []string{"2021-05-10T17:00:00Z"}},
 		},
-		Fragment: "degree",
-	},
-	example7: {
-		DID: did.DID{
-			Method: "example",
-			SpecID: "123",
-		},
-		Query: url.Values{"versionTime": []string{"2021-05-10T17:00:00Z"}},
-	},
-	"did:example:123?service=files&relativeRef=/resume.pdf": {
-		DID: did.DID{
-			Method: "example",
-			SpecID: "123",
-		},
-		Query: url.Values{"service": []string{"files"},
-			"relativeRef": []string{"/resume.pdf"},
+	}, {
+		example8,
+		did.URL{
+			DID: did.DID{
+				Method: "example",
+				SpecID: "123",
+			},
+			Query: url.Values{"service": []string{"files"},
+				"relativeRef": []string{"/resume.pdf"},
+			},
 		},
 	},
 }
 
 func TestParseURL(t *testing.T) {
-	for s, want := range GoldenURLs {
-		got, err := did.ParseURL(s)
+	for _, gold := range GoldenURLs {
+		got, err := did.ParseURL(gold.S)
 		if err != nil {
-			t.Errorf("DID %q got error: %s", s, err)
+			t.Errorf("DID %q got error: %s", gold.S, err)
 			continue
 		}
 
-		if got.Method != want.Method {
-			t.Errorf("DID %q got method %q, want %q", s, got.Method, want.Method)
+		if got.Method != gold.Method {
+			t.Errorf("DID %q got method %q, want %q", gold.S, got.Method, gold.Method)
 		}
-		if got.SpecID != want.SpecID {
-			t.Errorf("DID %q got method-specific identifier %q, want %q", s, got.SpecID, want.SpecID)
+		if got.SpecID != gold.SpecID {
+			t.Errorf("DID %q got method-specific identifier %q, want %q", gold.S, got.SpecID, gold.SpecID)
 		}
-		if got.RawPath != want.RawPath {
-			t.Errorf("DID %q got raw path %q, want %q", s, got.RawPath, want.RawPath)
+		if got.RawPath != gold.RawPath {
+			t.Errorf("DID %q got raw path %q, want %q", gold.S, got.RawPath, gold.RawPath)
 		}
-		if !reflect.DeepEqual(got.Query, want.Query) {
-			t.Errorf("DID %q got params %q, want %q", s, got.Query, want.Query)
+		if !reflect.DeepEqual(got.Query, gold.Query) {
+			t.Errorf("DID %q got params %q, want %q", gold.S, got.Query, gold.Query)
 		}
-		if got.Fragment != want.Fragment {
-			t.Errorf("DID %q got fragment %q, want %q", s, got.Fragment, want.Fragment)
+		if got.Fragment != gold.Fragment {
+			t.Errorf("DID %q got fragment %q, want %q", gold.S, got.Fragment, gold.Fragment)
 		}
 	}
 }
@@ -277,10 +317,15 @@ var SelectEquals = [][]string{
 		"#escap%65d%F0%9F%A4%96",
 	},
 	{
-		"/%ee#%ff",
-		"/%eE#%fF",
-		"/%Ee#%FF",
-		"/%EE#%FF",
+		"#escaped=%F0%9F%A4%96",
+		"#%65scaped=%F0%9F%A4%96",
+		"#escap%65d=%F0%9F%A4%96",
+	},
+	{
+		"/%ee?%aa=%bb#%ff",
+		"/%eE?%aA=%bB#%fF",
+		"/%Ee?%Aa=%Bb#%Ff",
+		"/%EE?%AA=%BB#%FF",
 	},
 }
 
