@@ -68,7 +68,7 @@ func (e *SyntaxError) Error() string {
 }
 
 // Unwrap implements the errors.Unwrap convention.
-func (e SyntaxError) Unwrap() error {
+func (e *SyntaxError) Unwrap() error {
 	return e.Err
 }
 
