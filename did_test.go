@@ -64,6 +64,7 @@ func FuzzParse(f *testing.F) {
 			if e.S != s {
 				t.Errorf("Parse(%q) got SyntaxError.S %q", s, e.S)
 			}
+			e.Error()
 		default:
 			t.Errorf("got not a SyntaxError: %s", err)
 		}
