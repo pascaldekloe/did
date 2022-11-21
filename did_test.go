@@ -211,13 +211,13 @@ func TestDIDEqual(t *testing.T) {
 	}
 }
 
-func ExampleDIDResolve() {
+func ExampleDID_Resolve() {
 	base := did.DID{Method: "example", SpecID: "101"}
 	tests := []string{
 		"/hello",
 		"any?",
 		"#body",
-		"did:example:*",
+		"did:example:2",
 		"did:foo:bar",
 		"http://localhost:8080",
 	}
@@ -234,7 +234,7 @@ func ExampleDIDResolve() {
 	// • did:example:101/hello
 	// • did:example:101/any
 	// • did:example:101#body
-	// • did:example:*
+	// • did:example:2
 	// • did:foo:bar
 	// • http://localhost:8080
 }
