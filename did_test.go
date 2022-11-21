@@ -1,9 +1,11 @@
 package did_test
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -50,6 +52,48 @@ func ExampleParse_percentEncoding() {
 	// Output:
 	// parsed: escaped🤖
 	// string: did:example:escaped%F0%9F%A4%96
+}
+
+var GoldenDIDErrors = []struct{ DID, Err string }{
+	{"urn:issn:0-670-85668-1", `invalid DID "urn:issn:0-670-85668-1": no "did:" scheme`},
+	{"d", `invalid DID "d": no "did:" scheme`},
+	{"di", `invalid DID "di": no "did:" scheme`},
+	{"did", `invalid DID "did": no "did:" scheme`},
+
+	{"did:", `invalid DID "did:": end incomplete`},
+	{"did:foo", `invalid DID "did:foo": end incomplete`},
+	{"did:foo:", `invalid DID "did:foo:": end incomplete`},
+	{"did:foo:%", `invalid DID "did:foo:%": end incomplete`},
+	{"did:foo:%b", `invalid DID "did:foo:%b": end incomplete`},
+
+	{"did::bar", `invalid DID "did::bar": illegal ':' at byte № 5`},
+	{"did:X:bar", `invalid DID "did:X:bar": illegal 'X' at byte № 5`},
+	{"did:a-1:bar", `invalid DID "did:a-1:bar": illegal '-' at byte № 6`},
+	{"did:f%6Fo:bar", `invalid DID "did:f%6Fo:bar": illegal '%' at byte № 6`},
+
+	{"did:foo:bar:", `invalid DID "did:foo:bar:": illegal ':' at byte № 12`},
+	{"did:foo:bar:,", `invalid DID "did:foo:bar:,": illegal ',' at byte № 13`},
+	{"did:foo:bar:%X0", `invalid DID "did:foo:bar:%X0": illegal 'X' at byte № 14`},
+	{"did:foo:bar:%0Y", `invalid DID "did:foo:bar:%0Y": illegal 'Y' at byte № 15`},
+
+	{"did:long" + strings.Repeat("g", 1000), `invalid DID "did:longggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg…" [truncated]: end incomplete`},
+	{"did:long" + strings.Repeat("g", 1000) + ":~", `invalid DID "did:longggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg…" [truncated]: illegal '~' at byte № 1010`},
+}
+
+func TestParseErrors(t *testing.T) {
+	for _, gold := range GoldenDIDErrors {
+		got, err := did.Parse(gold.DID)
+		switch err.(type) {
+		case nil:
+			t.Errorf("%q got %+v, want SyntaxError %q", gold.DID, got, gold.Err)
+		case *did.SyntaxError:
+			if s := err.Error(); s != gold.Err {
+				t.Errorf("%q got error %q, want %q", gold.DID, s, gold.Err)
+			}
+		default:
+			t.Errorf("%q got error type %T (%q), want a *did.SyntaxError", gold.DID, err, err)
+		}
+	}
 }
 
 func FuzzParse(f *testing.F) {
@@ -302,6 +346,55 @@ func TestParseURL(t *testing.T) {
 		if got.Fragment != gold.Fragment {
 			t.Errorf("DID %q got fragment %q, want %q", gold.S, got.Fragment, gold.Fragment)
 		}
+	}
+}
+
+var GoldenURLErrors = []struct{ URL, Err string }{
+	{"did:foo:bar/%", `invalid DID "did:foo:bar/%": end incomplete`},
+	{"did:foo:bar/%X0", `invalid DID "did:foo:bar/%X0": illegal 'X' at byte № 14`},
+}
+
+func TestParseURLErrors(t *testing.T) {
+	// ParseURL should give the same error as Parse for plain DIDs.
+	for _, gold := range GoldenDIDErrors {
+		got, err := did.ParseURL(gold.DID)
+		switch err.(type) {
+		case nil:
+			t.Errorf("%q got %+v, want SyntaxError %q", gold.DID, got, gold.Err)
+		case *did.SyntaxError:
+			if s := err.Error(); s != gold.Err {
+				t.Errorf("%q got error %q, want %q", gold.DID, s, gold.Err)
+			}
+		default:
+			t.Errorf("%q got error type %T (%q), want a *did.SyntaxError", gold.DID, err, err)
+		}
+	}
+
+	for _, gold := range GoldenURLErrors {
+		got, err := did.ParseURL(gold.URL)
+		switch err.(type) {
+		case nil:
+			t.Errorf("%q got %+v, want SyntaxError %q", gold.URL, got, gold.Err)
+		case *did.SyntaxError:
+			if s := err.Error(); s != gold.Err {
+				t.Errorf("%q got error %q, want %q", gold.URL, s, gold.Err)
+			}
+		default:
+			t.Errorf("%q got error type %T (%q), want a *did.SyntaxError", gold.URL, err, err)
+		}
+	}
+
+	const URL = "did:foo:bar#%X0"
+	got, err := did.ParseURL(URL)
+	switch err.(type) {
+	case nil:
+		t.Errorf("%q got %+v, want a SyntaxError", URL, got)
+	case *did.SyntaxError:
+		if !errors.As(err, new(url.EscapeError)) {
+			t.Errorf("%q got error %#v, want a wrapped url.EscapeError", URL, err)
+		}
+	default:
+		t.Errorf("%q got error type %T (%q), want a *did.SyntaxError", URL, err, err)
 	}
 }
 

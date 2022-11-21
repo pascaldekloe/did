@@ -28,48 +28,43 @@ type DID struct {
 	SpecID string
 }
 
-// ErrScheme denies an input string.
-var ErrScheme = errors.New("not a DID")
-
-// SyntaxError denies a DID on validation.
+// SyntaxError denies a DID string on validation constraints.
 type SyntaxError struct {
 	// S is the original input as provided to the parser.
 	S string
 
-	// I has the index in S of the first illegal character [byte], with
-	// len(S) for an unexpect end of S, or a negative value for undefined.
+	// I has the index of the first illegal character [byte] in S, with
+	// len(S) for an unexpected end of input, or -1 for location unknown.
 	I int
 
-	// Err may specify an underlying cause, such as ErrScheme.
-	Err error
+	err error // optional cause
 }
 
 // Error implements the standard error interface.
 func (e *SyntaxError) Error() string {
+	var desc string
 	switch {
-	case e.Err != nil:
-		return "invalid DID: " + e.Err.Error()
-
+	case e.err != nil:
+		desc = e.err.Error()
 	case e.I < 0:
-		return "invalid DID"
-
+		desc = "reason unknown" // should not happen ™️
+	case e.I < len(prefix):
+		desc = `no "` + prefix + `" scheme`
 	case e.I >= len(e.S):
-		return "incomplete DID"
-
-	case e.S[e.I] == '%':
-		if len(e.S)-e.I < 3 {
-			return "incomplete DID percent-encoding"
-		}
-		return fmt.Sprintf("illegal DID percent-encoding digits %q", e.S[e.I+1:e.I+3])
-
+		desc = "end incomplete"
 	default:
-		return fmt.Sprintf("illegal character %q at DID byte № %d", e.S[e.I], e.I+1)
+		desc = fmt.Sprintf("illegal %q at byte № %d", e.S[e.I], e.I+1)
 	}
+
+	if len(e.S) <= 200 {
+		return fmt.Sprintf("invalid DID %q: %s", e.S, desc)
+	}
+	return fmt.Sprintf("invalid DID %q [truncated]: %s", e.S[:199]+"…", desc)
 }
 
 // Unwrap implements the errors.Unwrap convention.
 func (e *SyntaxError) Unwrap() error {
-	return e.Err
+	return e.err
 }
 
 // Parse validates s in full. It returns the mapping if, and only if s conforms
@@ -88,11 +83,8 @@ func Parse(s string) (DID, error) {
 
 func readMethodName(s string) (string, error) {
 	for i := range prefix {
-		if i >= len(s) {
+		if i >= len(s) || s[i] != prefix[i] {
 			return "", &SyntaxError{S: s, I: i}
-		}
-		if s[i] != prefix[i] {
-			return "", &SyntaxError{S: s, I: i, Err: ErrScheme}
 		}
 	}
 
@@ -382,7 +374,11 @@ func ParseURL(s string) (*URL, error) {
 
 	p, err := url.Parse(s[end:])
 	if err != nil {
-		return nil, &SyntaxError{S: s, Err: err}
+		var wrap *url.Error // not usefull
+		if errors.As(err, &wrap) {
+			err = wrap.Err // trim
+		}
+		return nil, &SyntaxError{S: s, I: -1, err: err}
 	}
 	u.Fragment = p.Fragment
 	if p.RawQuery != "" {
