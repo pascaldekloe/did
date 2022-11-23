@@ -9,15 +9,15 @@ import (
 )
 
 func ExampleClient_Resolve() {
-	doc, _, err := new(didweb.Client).Resolve("https://api.preprod.ebsi.eu/did-registry/v3/identifiers/did:ebsi:zqwtmBuhZoANA2YzwPL7jf4")
+	doc, _, err := new(didweb.Client).Resolve("https://identity.foundation/.well-known/did.json")
 	switch {
 	case err == nil:
 		fmt.Println("got DID", doc.Subject)
 	case errors.Is(err, did.ErrNotFound):
-		fmt.Println("test transaction from EBSI pre-production unavailable")
+		fmt.Println("DIF .well-known DID not found")
 	default:
 		fmt.Println(err)
 	}
 	// Output:
-	// got DID did:ebsi:zqwtmBuhZoANA2YzwPL7jf4
+	// got DID did:web:identity.foundation
 }
