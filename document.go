@@ -57,6 +57,23 @@ type Document struct {
 	Services []*Service `json:"service,omitempty"`
 }
 
+// VerificationMethod returns the VerificationMethods entry that matches URL s
+// with its "id" property, with nil for not found.
+func (doc *Document) VerificationMethodOrNil(s string) *VerificationMethod {
+	// The URL must be valid. It can be relative.
+	s, err := doc.Subject.Resolve(s)
+	if err != nil {
+		return nil
+	}
+
+	for _, m := range doc.VerificationMethods {
+		if m.ID.Equal(s) {
+			return m
+		}
+	}
+	return nil
+}
+
 // Set represents a string, or a set of strings that confrom to the DID syntax.
 type Set []DID
 
@@ -188,77 +205,4 @@ func (r *VerificationRelationship) UnmarshalJSON(bytes []byte) error {
 	}
 
 	return nil
-}
-
-// EmbeddedVerificationMethods compiles a snapshot with all available methods.
-func (doc *Document) EmbeddedVerificationMethods() (*EmbeddedVerificationMethods, error) {
-	relationships := [...]*VerificationRelationship{
-		doc.Authentication,
-		doc.AssertionMethod,
-		doc.KeyAgreement,
-		doc.CapabilityInvocation,
-		doc.CapabilityDelegation,
-	}
-
-	// count number of methods, including potential duplicates
-	max := len(doc.VerificationMethods)
-	for _, r := range relationships {
-		if r != nil {
-			max += len(r.Methods)
-		}
-	}
-	perID := make(map[string]*VerificationMethod, max)
-
-	// install verifacition methods
-	for _, m := range doc.VerificationMethods {
-		s := m.ID.String()
-		if _, ok := perID[s]; ok {
-			return nil, fmt.Errorf(`DID document has duplicate %q in "verificationMethod" property`, s)
-		}
-		perID[s] = m
-	}
-
-	// include embedded methods
-	for _, r := range relationships {
-		if r == nil {
-			continue
-		}
-		for _, m := range r.Methods {
-			s := m.ID.String()
-			// no overwrites
-			m0, ok := perID[s]
-			if !ok {
-				perID[s] = m
-			} else if m0 != m {
-				return nil, fmt.Errorf("DID document has %q embedded twice with differing content", s)
-			}
-		}
-	}
-
-	return &EmbeddedVerificationMethods{doc, perID}, nil
-}
-
-// EmbeddedVerificationMethods holds a snapshot of all embedded entries in any
-// of the “core properties” from a DID Document. Any changes to the Document
-// will not be reflected.
-type EmbeddedVerificationMethods struct {
-	Doc *Document // subject
-	// PerID holds the mapping for a document.
-	PerID map[string]*VerificationMethod
-}
-
-// DereferenceOrNil returns a URL reference lookup, with nil for not found.
-func (e EmbeddedVerificationMethods) DereferenceOrNil(s string) *VerificationMethod {
-	// fast-path first
-	method, ok := e.PerID[s]
-	if ok {
-		return method
-	}
-
-	r, err := e.Doc.Subject.Resolve(s)
-	if err != nil {
-		// ignore malformed URL
-		return nil
-	}
-	return e.PerID[r]
 }
