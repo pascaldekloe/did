@@ -137,11 +137,7 @@ type VerificationRelationship struct {
 }
 
 // MarshalJSON implements the json.Marshaler interface.
-func (r *VerificationRelationship) MarshalJSON() ([]byte, error) {
-	if r == nil {
-		return []byte{'n', 'u', 'l', 'l'}, nil
-	}
-
+func (r VerificationRelationship) MarshalJSON() ([]byte, error) {
 	// embedded methods as JSON object array
 	buf, err := json.Marshal(r.Methods)
 	if err != nil {

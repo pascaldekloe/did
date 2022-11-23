@@ -764,7 +764,7 @@ func (u *URL) SetVersionParams(s string, t time.Time) {
 }
 
 // MarshalJSON implements the json.Marshaler interface.
-func (u URL) MarshalJSON() ([]byte, error) {
+func (u *URL) MarshalJSON() ([]byte, error) {
 	return json.Marshal(u.String())
 }
 

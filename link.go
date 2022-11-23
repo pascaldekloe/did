@@ -24,8 +24,8 @@ type VerificationMethod struct {
 
 // AdditionalString returns the value if, and only if the property is present,
 // and its value is a valid JSON string.
-func (method *VerificationMethod) AdditionalString(property string) string {
-	raw, ok := method.Additional[property]
+func (m *VerificationMethod) AdditionalString(property string) string {
+	raw, ok := m.Additional[property]
 	if !ok {
 		return ""
 	}
@@ -38,19 +38,19 @@ func (method *VerificationMethod) AdditionalString(property string) string {
 }
 
 // MarshalJSON implements the json.Marshaler interface.
-func (method *VerificationMethod) MarshalJSON() ([]byte, error) {
+func (m *VerificationMethod) MarshalJSON() ([]byte, error) {
 	buf := make([]byte, 0, 256)
 
 	buf = append(buf, `{"id":`...)
-	buf = strconv.AppendQuote(buf, method.ID.String())
+	buf = strconv.AppendQuote(buf, m.ID.String())
 
 	buf = append(buf, `,"type":`...)
-	buf = strconv.AppendQuote(buf, method.Type)
+	buf = strconv.AppendQuote(buf, m.Type)
 
 	buf = append(buf, `,"controller":`...)
-	buf = strconv.AppendQuote(buf, method.Controller.String())
+	buf = strconv.AppendQuote(buf, m.Controller.String())
 
-	for property, value := range method.Additional {
+	for property, value := range m.Additional {
 		switch property {
 		case "id", "type", "controller":
 			return nil, fmt.Errorf(`found required DID verification-method property %q in additional set`, property)
@@ -67,32 +67,32 @@ func (method *VerificationMethod) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
-func (method *VerificationMethod) UnmarshalJSON(bytes []byte) error {
+func (m *VerificationMethod) UnmarshalJSON(bytes []byte) error {
 	// Read all properties as Additional first.
-	err := json.Unmarshal(bytes, &method.Additional)
+	err := json.Unmarshal(bytes, &m.Additional)
 	if err != nil {
 		return err
 	}
 
 	// Second, extract the required from Additional.
-	err = method.popPropertyInto("id", &method.ID)
+	err = m.popPropertyInto("id", &m.ID)
 	if err != nil {
 		return err
 	}
-	err = method.popPropertyInto("type", &method.Type)
+	err = m.popPropertyInto("type", &m.Type)
 	if err != nil {
 		return err
 	}
-	return method.popPropertyInto("controller", &method.Controller)
+	return m.popPropertyInto("controller", &m.Controller)
 }
 
 // PopPropertyInto unmarshals a required property.
-func (method *VerificationMethod) popPropertyInto(name string, pointer any) error {
-	raw, ok := method.Additional[name]
+func (m *VerificationMethod) popPropertyInto(name string, pointer any) error {
+	raw, ok := m.Additional[name]
 	if !ok {
 		return fmt.Errorf(`missing DID verification-method property %q`, name)
 	}
-	delete(method.Additional, name)
+	delete(m.Additional, name)
 
 	err := json.Unmarshal([]byte(raw), pointer)
 	if err != nil {
@@ -118,8 +118,8 @@ type Service struct {
 
 // AdditionalString returns the value if, and only if the property is present,
 // and its value is a valid JSON string.
-func (service *Service) AdditionalString(property string) string {
-	raw, ok := service.Additional[property]
+func (srv *Service) AdditionalString(property string) string {
+	raw, ok := srv.Additional[property]
 	if !ok {
 		return ""
 	}
@@ -230,7 +230,7 @@ type ServiceEndpoint struct {
 var errNoServiceEndpoint = errors.New("no DID service endpoint set")
 
 // MarshalJSON implements the json.Marshaler interface.
-func (e *ServiceEndpoint) MarshalJSON() ([]byte, error) {
+func (e ServiceEndpoint) MarshalJSON() ([]byte, error) {
 	switch {
 	case len(e.URIRefs) == 0 && len(e.Objects) == 0:
 		return nil, errNoServiceEndpoint
