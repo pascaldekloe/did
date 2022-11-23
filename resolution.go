@@ -8,6 +8,10 @@ import (
 // DID resolution errors standardise Resolve error cases conform W3C's
 // recommendation.
 var (
+	// “The DID supplied to the DID resolution function does not conform to
+	// valid syntax.”
+	ErrInvalid = errors.New("invalid DID")
+
 	// “The DID resolver was unable to find the DID document resulting from
 	// this resolution request.”
 	ErrNotFound = errors.New("DID document not found")
@@ -21,7 +25,7 @@ var (
 // Resolve a DID into a Document by using the “Read” operation of the DID
 // Method.
 //
-// Implementations should return a SyntaxError when encountering an "invalidDid"
+// Implementations should return ErrInvalid when encountering an "invalidDid"
 // error code, or ErrNotFound on the "notFound" code, or ErrMediaType on the
 // "representationNotSupported" code.
 type Resolve func(DID) (*Document, *Meta, error)
