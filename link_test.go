@@ -63,6 +63,32 @@ const example13 = `{
   }]
 }`
 
+func ExampleVerificationMethod_jSON() {
+	var doc did.Document
+	err := json.Unmarshal([]byte(example12), &doc)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if l := len(doc.VerificationMethods); l != 2 {
+		fmt.Println("verifacition method count:", l)
+		return
+	}
+	method0 := doc.VerificationMethods[0]
+	fmt.Printf("• %s has JWK %s\n", &method0.ID, method0.Additional["publicKeyJwk"])
+	method1 := doc.VerificationMethods[1]
+	fmt.Printf("• %s has multibase %s\n", &method1.ID, method1.AdditionalString("publicKeyMultibase"))
+	// Output:
+	// • did:example:123#_Qq0UL2Fq651Q0Fjd6TvnYE-faHiOpRlPVQcY_-tA4A has JWK {
+	//       "crv": "Ed25519",
+	//       "x": "VCpo2LMLhn6iWku8MKvSLg2ZAoC-nlOyPVQaO3FxVeQ",
+	//       "kty": "OKP",
+	//       "kid": "_Qq0UL2Fq651Q0Fjd6TvnYE-faHiOpRlPVQcY_-tA4A"
+	//     }
+	// • did:example:123456789abcdefghi#keys-1 has multibase zH3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV
+}
+
 func TestVerificationMethodMarshalJSON(t *testing.T) {
 	var want bytes.Buffer
 	// normalize sample (in sync with json.Marshal output)
@@ -119,29 +145,4 @@ func TestVerificationMethodMarshalJSON(t *testing.T) {
 		t.Errorf("got:  %s", got)
 		t.Errorf("want: %s", want.Bytes())
 	}
-}
-
-func ExampleVerificationMethod_jSON() {
-	var doc did.Document
-	err := json.Unmarshal([]byte(example12), &doc)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	if l := len(doc.VerificationMethods); l != 2 {
-		fmt.Println("verifacition method count:", l)
-	}
-	method0 := doc.VerificationMethods[0]
-	fmt.Printf("• %s has JWK %s\n", &method0.ID, method0.Additional["publicKeyJwk"])
-	method1 := doc.VerificationMethods[1]
-	fmt.Printf("• %s has multibase %s\n", &method1.ID, method1.AdditionalString("publicKeyMultibase"))
-	// Output:
-	// • did:example:123#_Qq0UL2Fq651Q0Fjd6TvnYE-faHiOpRlPVQcY_-tA4A has JWK {
-	//       "crv": "Ed25519",
-	//       "x": "VCpo2LMLhn6iWku8MKvSLg2ZAoC-nlOyPVQaO3FxVeQ",
-	//       "kty": "OKP",
-	//       "kid": "_Qq0UL2Fq651Q0Fjd6TvnYE-faHiOpRlPVQcY_-tA4A"
-	//     }
-	// • did:example:123456789abcdefghi#keys-1 has multibase zH3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV
 }
