@@ -61,7 +61,7 @@ type Document struct {
 // with its "id" property, with nil for not found.
 func (doc *Document) VerificationMethodOrNil(s string) *VerificationMethod {
 	// The URL must be valid. It can be relative.
-	s, err := doc.Subject.Resolve(s)
+	s, err := doc.Subject.ResolveReference(s)
 	if err != nil {
 		return nil
 	}

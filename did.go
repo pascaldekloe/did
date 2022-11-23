@@ -233,19 +233,22 @@ func (d DID) Equal(s string) bool {
 	return s == ""
 }
 
-// Resolve returns an absolute URL, using the DID as a base URI.
-func (base DID) Resolve(s string) (string, error) {
-	p, err := url.Parse(s)
+// ResolveReference resolves URI reference r to an absolute URI from base URI d,
+// conform RFC 3986, section 5: “Reference Resolution”. The URI reference may be
+// absolute or relative. If r is an absolute URL, then ResolveReference ignores
+// d and it returns r as is.
+func (d DID) ResolveReference(r string) (string, error) {
+	p, err := url.Parse(r)
 	if err != nil {
 		return "", err
 	}
 
 	if p.IsAbs() {
-		return s, nil
+		return r, nil
 	}
 
 	u := URL{
-		DID:      base,
+		DID:      d, // copy
 		RawPath:  p.Path,
 		Query:    p.Query(),
 		Fragment: p.Fragment,

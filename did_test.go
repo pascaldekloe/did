@@ -212,7 +212,7 @@ func TestDIDEqual(t *testing.T) {
 	}
 }
 
-func ExampleDID_Resolve() {
+func ExampleDID_ResolveReference() {
 	base := did.DID{Method: "example", SpecID: "101"}
 	tests := []string{
 		"/hello",
@@ -224,7 +224,7 @@ func ExampleDID_Resolve() {
 	}
 
 	for _, t := range tests {
-		s, err := base.Resolve(t)
+		s, err := base.ResolveReference(t)
 		if err != nil {
 			fmt.Println(err)
 		} else {
