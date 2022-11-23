@@ -1,4 +1,4 @@
-// Package did fully implements W3C's Decentralised Identifier (DID) standard.
+// Package did implements W3C's Decentralised Identifier (DID) standard.
 // See https://www.w3.org/TR/did-core/ for the specification.
 package did
 
