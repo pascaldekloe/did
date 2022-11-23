@@ -67,6 +67,7 @@ var GoldenDIDErrors = []struct{ DID, Err string }{
 	{"did:foo:%b", `invalid DID "did:foo:%b": end incomplete`},
 
 	{"did::bar", `invalid DID "did::bar": illegal ':' at byte № 5`},
+	{"did:foo:bar:", `invalid DID "did:foo:bar:": illegal ':' at byte № 12`},
 	{"did:X:bar", `invalid DID "did:X:bar": illegal 'X' at byte № 5`},
 	{"did:a-1:bar", `invalid DID "did:a-1:bar": illegal '-' at byte № 6`},
 	{"did:f%6Fo:bar", `invalid DID "did:f%6Fo:bar": illegal '%' at byte № 6`},
@@ -318,6 +319,14 @@ var GoldenURLs = []struct {
 			},
 			Query: url.Values{"service": []string{"files"},
 				"relativeRef": []string{"/resume.pdf"},
+			},
+		},
+	}, {
+		"did:foo:bar:baz",
+		did.URL{
+			DID: did.DID{
+				Method: "foo",
+				SpecID: "bar:baz",
 			},
 		},
 	},
