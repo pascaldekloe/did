@@ -28,8 +28,8 @@ type Client struct {
 }
 
 // Resolve fetches a document in a standard compliant manner.
-func (c *Client) Resolve(URL string) (*did.Document, *did.Meta, error) {
-	req, err := http.NewRequest(http.MethodGet, URL, nil)
+func (c *Client) Resolve(webURL string) (*did.Document, *did.Meta, error) {
+	req, err := http.NewRequest(http.MethodGet, webURL, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%w: %s", did.ErrNotFound, err)
 	}
@@ -47,7 +47,23 @@ func (c *Client) Resolve(URL string) (*did.Document, *did.Meta, error) {
 	case http.StatusNotAcceptable:
 		return nil, nil, fmt.Errorf("%w—want JSON", did.ErrMediaType)
 	default:
-		return nil, nil, fmt.Errorf("HTTP %q for DID document %s", res.Status, URL)
+		// best-effort error code resolution
+		buf := make([]byte, 32*1023)
+		var meta struct {
+			Error string `json:"error"`
+		}
+		n, _ := io.ReadFull(res.Body, buf[:])
+		json.Unmarshal(buf[:n], &meta)
+		switch meta.Error {
+		case "invalidDid":
+			return nil, nil, did.ErrInvalid
+		case "notFound":
+			return nil, nil, did.ErrNotFound
+		case "representationNotSupported":
+			return nil, nil, did.ErrMediaType
+		}
+
+		return nil, nil, fmt.Errorf("HTTP %q for DID document %s", res.Status, webURL)
 	}
 
 	var m did.Meta
@@ -75,8 +91,8 @@ func (c *Client) Resolve(URL string) (*did.Document, *did.Meta, error) {
 	case err == nil:
 		return &d, &m, nil
 	case r.N <= 0:
-		return nil, nil, fmt.Errorf("%w: %s reached %d bytes", ErrDownloadMax, URL, max)
+		return nil, nil, fmt.Errorf("%w: %s reached %d bytes", ErrDownloadMax, webURL, max)
 	default:
-		return nil, nil, fmt.Errorf("DID document %q unavailable: %w", URL, err)
+		return nil, nil, fmt.Errorf("DID document %q unavailable: %w", webURL, err)
 	}
 }
