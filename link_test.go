@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/pascaldekloe/did"
@@ -65,17 +64,23 @@ const example13 = `{
 }`
 
 func TestVerificationMethodMarshalJSON(t *testing.T) {
-	// BUG(pascaldekloe): Test has workaround for missing @context support.
-	var example = "{" + example13[strings.Index(example13, `"id"`):]
-
 	var want bytes.Buffer
 	// normalize sample (in sync with json.Marshal output)
-	err := json.Compact(&want, []byte(example))
+	err := json.Compact(&want, []byte(example13))
 	if err != nil {
 		t.Fatal("sample preparation:", err)
 	}
 
-	doc := did.Document{Subject: did.DID{Method: "example", SpecID: "123456789abcdefghi"}}
+	var doc struct {
+		Context []string `json:"@context"`
+		did.Document
+	}
+	doc.Context = []string{
+		"https://www.w3.org/ns/did/v1",
+		"https://w3id.org/security/suites/jws-2020/v1",
+		"https://w3id.org/security/suites/ed25519-2020/v1",
+	}
+	doc.Subject = did.DID{Method: "example", SpecID: "123456789abcdefghi"}
 	doc.VerificationMethods = []*did.VerificationMethod{
 		{
 			ID: did.URL{
