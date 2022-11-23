@@ -28,7 +28,7 @@ type Client struct {
 }
 
 // Resolve fetches a document in a standard compliant manner.
-func (c *Client) Resolve(URL string) (*did.Doc, *did.Meta, error) {
+func (c *Client) Resolve(URL string) (*did.Document, *did.Meta, error) {
 	req, err := http.NewRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%w: %s", did.ErrNotFound, err)
@@ -69,7 +69,7 @@ func (c *Client) Resolve(URL string) (*did.Doc, *did.Meta, error) {
 		N: int64(max),
 	}
 
-	var d did.Doc
+	var d did.Document
 	err = json.NewDecoder(&r).Decode(&d)
 	switch {
 	case err == nil:
