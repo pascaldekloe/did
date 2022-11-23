@@ -1,4 +1,4 @@
-// Package did implements W3C's Decentralised Identifier (DID) standard.
+// Package did implements W3C's Decentralized Identifier (DID) standard.
 // See https://www.w3.org/TR/did-core/ for the specification.
 package did
 
@@ -422,7 +422,7 @@ func readPath(s string, offset int) (string, error) {
 // Equal returns whether s compares equal to u. The method is compliant with the
 // “Normalization and Comparison” rules as defined by RFC 3986, section 6.
 //
-// Duplicate query-paramaters are compared in order of their respective
+// Duplicate query-parameters are compared in order of their respective
 // appearance, i.e., "?foo=1&foo=2" is not equal to "?foo=2&foo=1".
 func (u *URL) Equal(s string) bool {
 	for i := 0; i < len(s); i++ {
