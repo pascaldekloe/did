@@ -19,7 +19,7 @@ type VerificationMethod struct {
 	Controller DID    `json:"controller"` // required
 
 	// A verification method MAY include additional properties.
-	Additional map[string]json.RawMessage `json:",embed"`
+	Additional map[string]json.RawMessage `json:",-"`
 }
 
 // AdditionalString returns the value if, and only if the property is present,
@@ -113,7 +113,7 @@ type Service struct {
 
 	// Each service extension MAY include additional properties and MAY
 	// further restrict the properties associated with the extension.
-	Additional map[string]json.RawMessage `json:",embed"`
+	Additional map[string]json.RawMessage `json:",-"`
 }
 
 // AdditionalString returns the value if, and only if the property is present,
