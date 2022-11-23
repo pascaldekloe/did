@@ -124,16 +124,13 @@ func ExampleVerificationMethod_jSON() {
 		return
 	}
 
-	method0 := doc.VerificationMethods[0]
-	bytes := method0.Additional["publicKeyJwk"]
-	fmt.Printf("• %s has JWK %s\n", &method0.ID, bytes)
-
-	method1 := doc.VerificationMethods[1]
-	s, err := method1.AdditionalString("publicKeyMultibase")
-	if err != nil {
-		fmt.Println(err)
+	if l := len(doc.VerificationMethods); l != 2 {
+		fmt.Println("verifacition method count:", l)
 	}
-	fmt.Printf("• %s has multibase %s\n", &method1.ID, s)
+	method0 := doc.VerificationMethods[0]
+	fmt.Printf("• %s has JWK %s\n", &method0.ID, method0.Additional["publicKeyJwk"])
+	method1 := doc.VerificationMethods[1]
+	fmt.Printf("• %s has multibase %s\n", &method1.ID, method1.AdditionalString("publicKeyMultibase"))
 	// Output:
 	// • did:example:123#_Qq0UL2Fq651Q0Fjd6TvnYE-faHiOpRlPVQcY_-tA4A has JWK {
 	//       "crv": "Ed25519",

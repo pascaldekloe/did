@@ -22,14 +22,19 @@ type VerificationMethod struct {
 	Additional map[string]json.RawMessage `json:",embed"`
 }
 
-// AdditionalString returns the value, if the property is present, and the value
-// is a JSON string. The return is zero on property absence.
-func (method *VerificationMethod) AdditionalString(property string) (value string, _ error) {
+// AdditionalString returns the value if, and only if the property is present,
+// and its value is a valid JSON string.
+func (method *VerificationMethod) AdditionalString(property string) string {
 	raw, ok := method.Additional[property]
-	if ok {
-		return value, json.Unmarshal([]byte(raw), &value)
+	if !ok {
+		return ""
 	}
-	return "", nil
+	var s string
+	err := json.Unmarshal([]byte(raw), &s)
+	if err != nil {
+		return ""
+	}
+	return s
 }
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -111,14 +116,19 @@ type Service struct {
 	Additional map[string]json.RawMessage `json:",embed"`
 }
 
-// AdditionalString returns the value, if the property is present, and the value
-// is a JSON string. The return is zero on property absence.
-func (service *Service) AdditionalString(property string) (value string, _ error) {
+// AdditionalString returns the value if, and only if the property is present,
+// and its value is a valid JSON string.
+func (service *Service) AdditionalString(property string) string {
 	raw, ok := service.Additional[property]
-	if ok {
-		return value, json.Unmarshal([]byte(raw), &value)
+	if !ok {
+		return ""
 	}
-	return "", nil
+	var s string
+	err := json.Unmarshal([]byte(raw), &s)
+	if err != nil {
+		return ""
+	}
+	return s
 }
 
 var errNoServiceType = errors.New("no DID service type set")

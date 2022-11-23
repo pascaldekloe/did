@@ -103,12 +103,7 @@ func ExampleDocument_VerificationMethodOrNil_relativeURL() {
 		fmt.Println("referenced verification-method not found")
 		return
 	}
-	s, err := m.AdditionalString("publicKeyMultibase")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println("public key:", s)
+	fmt.Println("public key:", m.AdditionalString("publicKeyMultibase"))
 	// Output:
 	// referenced verification-methods: [#key-1]
 	// public key: zH3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV
