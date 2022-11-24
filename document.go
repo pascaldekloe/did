@@ -251,7 +251,7 @@ func (m *VerificationMethod) MarshalJSON() ([]byte, error) {
 	for property, value := range m.Additional {
 		switch property {
 		case "id", "type", "controller":
-			return nil, fmt.Errorf(`found required DID verification-method property %q in additional set`, property)
+			return nil, fmt.Errorf(`found core DID verification-method property %q in additional set`, property)
 		}
 
 		buf = append(buf, ',')
@@ -272,7 +272,7 @@ func (m *VerificationMethod) UnmarshalJSON(bytes []byte) error {
 		return err
 	}
 
-	// Second, extract the required from Additional.
+	// Second, extract the core from Additional.
 	err = m.popPropertyInto("id", &m.ID)
 	if err != nil {
 		return err
@@ -284,7 +284,7 @@ func (m *VerificationMethod) UnmarshalJSON(bytes []byte) error {
 	return m.popPropertyInto("controller", &m.Controller)
 }
 
-// PopPropertyInto unmarshals a required property.
+// PopPropertyInto unmarshals a core property.
 func (m *VerificationMethod) popPropertyInto(name string, pointer any) error {
 	raw, ok := m.Additional[name]
 	if !ok {
@@ -366,7 +366,7 @@ func (srv *Service) MarshalJSON() ([]byte, error) {
 	for property, value := range srv.Additional {
 		switch property {
 		case "id", "type", "serviceEndpoint":
-			return nil, fmt.Errorf(`found required DID service property %q in additional set`, property)
+			return nil, fmt.Errorf(`found core DID service property %q in additional set`, property)
 		}
 
 		buf = append(buf, ',')
@@ -387,7 +387,7 @@ func (srv *Service) UnmarshalJSON(bytes []byte) error {
 		return err
 	}
 
-	// Second, extract the required from Additional.
+	// Second, extract the core from Additional.
 	if raw, ok := srv.Additional["id"]; !ok {
 		return errors.New(`DID service JSON has no "id"`)
 	} else {
