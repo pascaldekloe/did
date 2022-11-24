@@ -288,13 +288,13 @@ func (m *VerificationMethod) UnmarshalJSON(bytes []byte) error {
 func (m *VerificationMethod) popPropertyInto(name string, pointer any) error {
 	raw, ok := m.Additional[name]
 	if !ok {
-		return fmt.Errorf(`missing DID verification-method property %q`, name)
+		return fmt.Errorf("DID verification-method JSON has no %q", name)
 	}
 	delete(m.Additional, name)
 
 	err := json.Unmarshal([]byte(raw), pointer)
 	if err != nil {
-		return fmt.Errorf(`broken DID verification-method property %q: %w`, name, err)
+		return fmt.Errorf("DID verification-method JSON %q: %w", name, err)
 	}
 	return nil
 }
@@ -388,29 +388,55 @@ func (srv *Service) UnmarshalJSON(bytes []byte) error {
 	}
 
 	// Second, extract the required from Additional.
-	err = srv.popPropertyInto("id", &srv.ID)
-	if err != nil {
-		return err
+	if raw, ok := srv.Additional["id"]; !ok {
+		return errors.New(`DID service JSON has no "id"`)
+	} else {
+		delete(srv.Additional, "id")
+		var s string
+		err := json.Unmarshal([]byte(raw), &s)
+		if err != nil {
+			return fmt.Errorf(`DID service JSON "id": %w`, err)
+		}
+		p, err := url.Parse(s)
+		if err != nil {
+			return fmt.Errorf(`DID service JSON "id" content: %w`, err)
+		}
+		srv.ID = *p
 	}
-	// BUG(pascaldekloe): Can't unmarshal single strings for service type.
-	err = srv.popPropertyInto("type", &srv.Types)
-	if err != nil {
-		return err
-	}
-	return srv.popPropertyInto("serviceEndpoint", &srv.Endpoint)
-}
 
-// PopPropertyInto unmarshals a required property.
-func (srv *Service) popPropertyInto(name string, pointer any) error {
-	raw, ok := srv.Additional[name]
-	if !ok {
-		return fmt.Errorf(`missing DID service property %q`, name)
+	if raw, ok := srv.Additional["type"]; !ok {
+		return errors.New(`DID service JSON has no "type"`)
+	} else {
+		delete(srv.Additional, "type")
+		switch raw[0] {
+		case '"':
+			if cap(srv.Types) != 0 {
+				srv.Types = srv.Types[:1]
+			} else {
+				srv.Types = make([]string, 1)
+			}
+			err := json.Unmarshal([]byte(raw), &srv.Types[0])
+			if err != nil {
+				return err
+			}
+		case '[':
+			err := json.Unmarshal([]byte(raw), &srv.Types)
+			if err != nil {
+				return fmt.Errorf(`DID service JSON "type": %w`, err)
+			}
+		default:
+			return fmt.Errorf(`DID service JSON "type" is not a string nor a set of strings: %.12q`, raw)
+		}
 	}
-	delete(srv.Additional, name)
 
-	err := json.Unmarshal([]byte(raw), pointer)
-	if err != nil {
-		return fmt.Errorf(`broken DID service property %q: %w`, name, err)
+	if raw, ok := srv.Additional["serviceEndpoint"]; !ok {
+		return errors.New(`DID service JSON has no "serviceEndpoint"`)
+	} else {
+		delete(srv.Additional, "serviceEndpoint")
+		err := srv.Endpoint.UnmarshalJSON([]byte(raw))
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -448,6 +474,64 @@ func (e ServiceEndpoint) MarshalJSON() ([]byte, error) {
 		bytes = append(bytes, ']') // new array end
 	}
 	return bytes, err
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
+	// reset
+	e.URIRefs = e.URIRefs[:0]
+	e.Objects = e.Objects[:0]
+
+	switch bytes[0] {
+	case '"': // single string
+		if cap(e.URIRefs) != 0 {
+			e.URIRefs = e.URIRefs[:1]
+		} else {
+			e.URIRefs = make([]string, 1)
+		}
+		return json.Unmarshal(bytes, &e.URIRefs[0])
+
+	case '{': // single map
+		if cap(e.Objects) != 0 {
+			e.Objects = e.Objects[:1]
+		} else {
+			e.Objects = make([]json.RawMessage, 1)
+		}
+		e.Objects[0] = make(json.RawMessage, len(bytes))
+		copy(e.Objects[0], bytes)
+		return nil
+
+	case '[': // set composed of one or more strings and/or maps.
+		break
+
+	default:
+		return fmt.Errorf("DID serviceEndpoint JSON is not a string nor a map nor a set: %.12q", bytes)
+	}
+
+	var set []json.RawMessage
+	err := json.Unmarshal(bytes, &set)
+	if err != nil {
+		return err
+	}
+	if len(set) == 0 {
+		return errors.New("DID serviceEndpoint JSON set empty")
+	}
+	for _, raw := range set {
+		switch raw[0] {
+		case '"':
+			var s string
+			err = json.Unmarshal([]byte(raw), &s)
+			if err != nil {
+				return err
+			}
+			e.URIRefs = append(e.URIRefs, s)
+		case '{':
+			e.Objects = append(e.Objects, raw)
+		default:
+			return fmt.Errorf("DID serviceEndpoint JSON set entry is not a string nor a map: %.12q", raw)
+		}
+	}
+	return nil
 }
 
 // DID resolution errors standardise Resolve error cases conform W3C's

@@ -115,6 +115,16 @@ const example15 = `{
   ]
 }`
 
+// Example20 is borrowed from the W3C, excluding comments.
+// https://www.w3.org/TR/did-core/#example-usage-of-the-service-property
+const example20 = `{
+  "service": [{
+    "id":"did:example:123#linked-domain",
+    "type": "LinkedDomains",
+    "serviceEndpoint": "https://bar.example.com"
+  }]
+}`
+
 func TestDocSubjectJSON(t *testing.T) {
 	var doc did.Document
 	err := json.Unmarshal([]byte(example10), &doc)
@@ -271,5 +281,32 @@ func TestVerificationMethodMarshalJSON(t *testing.T) {
 	if !bytes.Equal(want.Bytes(), got) {
 		t.Errorf("got:  %s", got)
 		t.Errorf("want: %s", want.Bytes())
+	}
+}
+
+func TestServiceUnmarshalJSON(t *testing.T) {
+	var doc did.Document
+	err := json.Unmarshal([]byte(example20), &doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if l := len(doc.Services); l != 1 {
+		t.Fatalf("got %d services, want 1", l)
+	}
+	const wantID = "did:example:123#linked-domain"
+	if got := doc.Services[0].ID.String(); got != wantID {
+		t.Errorf("got service ID %q, want %q", got, wantID)
+	}
+	const wantType = "LinkedDomains"
+	if got := doc.Services[0].Types; len(got) != 1 || got[0] != wantType {
+		t.Errorf("got service type %q, want [%q]", got, wantType)
+	}
+	const wantEndpoint = "https://bar.example.com"
+	if got := doc.Services[0].Endpoint.URIRefs; len(got) != 1 || got[0] != wantEndpoint {
+		t.Errorf("got service endpoint strings %q, want [%q]", got, wantEndpoint)
+	}
+	if got := doc.Services[0].Endpoint.Objects; len(got) != 0 {
+		t.Errorf("got service endpoint maps %q, want none", got)
 	}
 }
