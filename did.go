@@ -762,6 +762,13 @@ func (u *URL) SetVersionParams(s string, t time.Time) {
 	}
 
 	if !t.IsZero() {
+		// JSON production requires “normalized to UTC 00:00:00 and
+		// without sub-second decimal precision”, as per subsection
+		// 6.2.1 of the v1 specification.
+		t := t.UTC()
+		if t.Nanosecond() != 0 {
+			t = t.Round(time.Second)
+		}
 		u.Query["versionTime"] = append(u.Query["versionTime"][:0], t.Format(time.RFC3339))
 	}
 }
