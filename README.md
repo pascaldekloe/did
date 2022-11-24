@@ -11,7 +11,7 @@ have been designed so that they may be decoupled from centralized registries,
 identity providers, and certificate authorities.”
 
 The implementation fully covers [W3C's standard](https://www.w3.org/TR/did-core)
-without use of third party libraries. Developers can follow their own preference
+without any third party libraries. Developers can follow their own preference
 for technologies such as JWK or multibase if needed.
 
 This is free and unencumbered software released into the
