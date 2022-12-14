@@ -260,8 +260,12 @@ func (d DID) ResolveReference(r string) (string, error) {
 	return u.String(), nil
 }
 
-// String returns the DID syntax.
+// String returns the DID syntax, with the empty string for the zero value.
 func (d DID) String() string {
+	if d.Method == "" && d.SpecID == "" {
+		return ""
+	}
+
 	var escapeN int
 	for i := 0; i < len(d.SpecID); i++ {
 		switch d.SpecID[i] {
@@ -551,7 +555,7 @@ func (u *URL) GoURL() *url.URL {
 	return p
 }
 
-// String returns the DID URL.
+// String returns the DID URL, with the empty string for the zero value.
 func (u *URL) String() string {
 	if u.RawPath == "" && len(u.Query) == 0 && u.Fragment == "" {
 		return u.DID.String()

@@ -121,6 +121,9 @@ var GoldenDIDs = []struct {
 	did.DID
 }{
 	{
+		"",
+		did.DID{},
+	}, {
 		"did:foo:bar",
 		did.DID{Method: "foo", SpecID: "bar"},
 	}, {
@@ -136,8 +139,8 @@ func TestDIDString(t *testing.T) {
 				t.Errorf("got %q, want %q", got, gold.S)
 			}
 		})
-		if n != 1 {
-			t.Errorf("%s did %f memory allocations, want 1", gold.S, n)
+		if n > 1 {
+			t.Errorf("%s did %f memory allocations, want at most 1", gold.S, n)
 		}
 	}
 }
