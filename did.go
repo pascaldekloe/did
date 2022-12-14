@@ -260,7 +260,9 @@ func (d DID) ResolveReference(r string) (string, error) {
 	return u.String(), nil
 }
 
-// String returns the DID syntax, with the empty string for the zero value.
+// String returns the DID syntax, with the empty string for the zero value. Any
+// and all colon characters (':') in the method-specific identifier are escaped
+// (with "%3A").
 func (d DID) String() string {
 	if d.Method == "" && d.SpecID == "" {
 		return ""
@@ -555,7 +557,9 @@ func (u *URL) GoURL() *url.URL {
 	return p
 }
 
-// String returns the DID URL, with the empty string for the zero value.
+// String returns the DID URL, with the empty string for the zero value. Any and
+// all colon characters (':') in the method-specific identifier are escaped
+// (with "%3A").
 func (u *URL) String() string {
 	if u.RawPath == "" && len(u.Query) == 0 && u.Fragment == "" {
 		return u.DID.String()
