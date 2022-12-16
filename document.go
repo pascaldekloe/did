@@ -60,17 +60,19 @@ type Document struct {
 	Services []*Service `json:"service,omitempty"`
 }
 
-// VerificationMethod returns the VerificationMethods entry that matches URL s
-// with its "id" property, with nil for not found.
-func (doc *Document) VerificationMethodOrNil(s string) *VerificationMethod {
-	// The URL must be valid. It can be relative.
-	s, err := doc.Subject.ResolveReference(s)
-	if err != nil {
-		return nil
+// VerificationMethodOrNil returns the VerificationMethods match if any, with
+// nil for not found.
+//
+// Duplicate URL query-parameters are compared in order of their respective
+// appearance, i.e., "?foo=1&foo=2" is not equal to "?foo=2&foo=1".
+func (doc *Document) VerificationMethodOrNil(u *URL) *VerificationMethod {
+	d := &u.DID
+	if u.IsRelative() {
+		d = &doc.Subject
 	}
 
 	for _, m := range doc.VerificationMethods {
-		if m.ID.Equal(s) {
+		if m.ID.Fragment == u.Fragment && m.ID.DID == *d && pathEqual(m.ID.RawPath, u.RawPath) && queryEqual(m.ID.Query, u.Query) {
 			return m
 		}
 	}
@@ -135,8 +137,12 @@ func (set *Set) UnmarshalJSON(bytes []byte) error {
 // Subject and a VerificationMethod. Each verification method MAY be either
 // embedded or referenced.
 type VerificationRelationship struct {
-	Methods []*VerificationMethod // embedded
-	URIRefs []string              // referenced
+	// The embedded Methods only apply to this relationship.
+	Methods []*VerificationMethod
+
+	// References will need to be retrieved from elsewhere in the DID
+	// Document or from another DID Document. See VerificationMethodOrNil.
+	URIRefs []*URL
 }
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -148,9 +154,9 @@ func (r VerificationRelationship) MarshalJSON() ([]byte, error) {
 	}
 
 	// URL refererences as JSON strings into array
-	for _, s := range r.URIRefs {
+	for _, u := range r.URIRefs {
 		buf[len(buf)-1] = ',' // flip array end
-		buf = strconv.AppendQuote(buf, s)
+		buf = strconv.AppendQuote(buf, u.String())
 		buf = append(buf, ']') // new array end
 	}
 
@@ -191,12 +197,12 @@ func (r *VerificationRelationship) UnmarshalJSON(bytes []byte) error {
 			r.Methods = append(r.Methods, m)
 
 		case '"': // refererce
-			var s string
-			err = json.Unmarshal([]byte(raw), &s)
+			var u URL
+			err = json.Unmarshal([]byte(raw), &u)
 			if err != nil {
 				return err
 			}
-			r.URIRefs = append(r.URIRefs, s)
+			r.URIRefs = append(r.URIRefs, &u)
 
 		default:
 			return fmt.Errorf("DID set of verification methods entry is not a JSON object nor a JSON string: %.12q", raw)

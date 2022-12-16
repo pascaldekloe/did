@@ -458,7 +458,7 @@ func (u *URL) IsRelative() bool { return u.Method == "" && u.SpecID == "" }
 // Equal returns whether s compares equal to u. The method is compliant with the
 // “Normalization and Comparison” rules as defined by RFC 3986, section 6.
 //
-// Duplicate query-parameters are compared in order of their respective
+// Duplicate URL query-parameters are compared in order of their respective
 // appearance, i.e., "?foo=1&foo=2" is not equal to "?foo=2&foo=1".
 func (u *URL) Equal(s string) bool {
 	for i := 0; i < len(s); i++ {
@@ -472,93 +472,96 @@ func (u *URL) Equal(s string) bool {
 			if err != nil {
 				return false
 			}
-			return u.Fragment == p.Fragment && pathEqual(u.RawPath, p) && u.queryEqual(p)
+			path := p.RawPath
+			if path == "" {
+				path = p.Path
+			}
+			return u.Fragment == p.Fragment && pathEqual(u.RawPath, path) && queryEqualURLQuery(u.Query, p)
 		}
 	}
 
 	return u.RawPath == "" && len(u.Query) == 0 && u.Fragment == "" && u.DID.Equal(s)
 }
 
-func pathEqual(s string, u *url.URL) bool {
-	t := u.RawPath
-	if t == "" {
-		t = u.Path
-	}
-
+func pathEqual(a, b string) bool {
 	// fast path
-	if s == t {
+	if a == b {
 		return true
 	}
 
-	// trim root
-	if s == "" || t == "" {
+	if a == "" || b == "" {
 		return false
 	}
-	if s[0] == '/' {
-		s = s[1:]
+	// trim root
+	if a[0] == '/' {
+		a = a[1:]
 	}
-	if t[0] == '/' {
-		t = t[1:]
+	if b[0] == '/' {
+		b = b[1:]
 	}
 
 	for {
 		switch {
-		case s == "":
-			return t == ""
-		case t == "":
+		case a == "":
+			return b == ""
+		case b == "":
 			return false
 		}
 
-		sc := s[0]
-		if sc != '%' {
-			s = s[1:]
+		ac := a[0]
+		if ac != '%' {
+			a = a[1:]
 		} else {
 			var err error
-			sc, err = parseHex(s, 1)
+			ac, err = parseHex(a, 1)
 			if err != nil {
 				return false
 			}
-			s = s[3:]
+			a = a[3:]
 		}
 
-		tc := t[0]
-		if tc != '%' {
-			t = t[1:]
+		bc := b[0]
+		if bc != '%' {
+			b = b[1:]
 		} else {
 			var err error
-			tc, err = parseHex(t, 1)
+			bc, err = parseHex(b, 1)
 			if err != nil {
 				return false
 			}
-			t = t[3:]
+			b = b[3:]
 		}
 
-		if sc != tc {
+		if ac != bc {
 			return false
 		}
 	}
 }
 
-func (u *URL) queryEqual(p *url.URL) bool {
-	if p.RawQuery == "" {
-		return len(u.Query) == 0
+func queryEqualURLQuery(q url.Values, u *url.URL) bool {
+	switch {
+	case u.RawQuery == "":
+		return len(q) == 0
+	case len(q) == 0:
+		return false
+	default:
+		return queryEqual(q, u.Query())
 	}
-	if len(u.Query) == 0 {
+}
+
+func queryEqual(a, b url.Values) bool {
+	if len(a) != len(b) {
 		return false
 	}
 
-	q := p.Query()
-	if len(q) != len(u.Query) {
-		return false
-	}
+	for name, values := range a {
+		match := b[name]
 
-	for name, values := range q {
-		match := u.Query[name]
-		if len(match) != len(values) {
+		if len(values) != len(match) {
 			return false
 		}
-		for i := range match {
-			if match[i] != values[i] {
+		for i := range values {
+			if values[i] != match[i] {
 				return false
 			}
 		}
