@@ -56,9 +56,8 @@ func ExampleParse_percentEncoding() {
 
 var GoldenDIDErrors = []struct{ DID, Err string }{
 	{"urn:issn:0-670-85668-1", `invalid DID "urn:issn:0-670-85668-1": no "did:" scheme`},
-	{"d", `invalid DID "d": no "did:" scheme`},
-	{"di", `invalid DID "di": no "did:" scheme`},
-	{"did", `invalid DID "did": no "did:" scheme`},
+	{"bitcoin:mjSk1Ny9spzU2fouzYgLqGUD8U41iR35QN?amount=100", `invalid DID "bitcoin:mjSk1Ny9spzU2fouzYgLqGUD8U41iR35QN?amount=100": no "did:" scheme`},
+	{"http://localhost/", `invalid DID "http://localhost/": no "did:" scheme`},
 
 	{"did:", `invalid DID "did:": end incomplete`},
 	{"did:foo", `invalid DID "did:foo": end incomplete`},
@@ -71,6 +70,15 @@ var GoldenDIDErrors = []struct{ DID, Err string }{
 	{"did:X:bar", `invalid DID "did:X:bar": illegal 'X' at byte № 5`},
 	{"did:a-1:bar", `invalid DID "did:a-1:bar": illegal '-' at byte № 6`},
 	{"did:f%6Fo:bar", `invalid DID "did:f%6Fo:bar": illegal '%' at byte № 6`},
+
+	// colon in method-specific identifier not allowed as last character
+	{"did:foo::", `invalid DID "did:foo::": illegal ':' at byte № 9`},
+	{"did:foo:::", `invalid DID "did:foo:::": illegal ':' at byte № 10`},
+	{"did:foo:bar:", `invalid DID "did:foo:bar:": illegal ':' at byte № 12`},
+	{"did:foo:bar::", `invalid DID "did:foo:bar::": illegal ':' at byte № 13`},
+	{"did:foo:bar:baz:", `invalid DID "did:foo:bar:baz:": illegal ':' at byte № 16`},
+	{"did:foo:%12:", `invalid DID "did:foo:%12:": illegal ':' at byte № 12`},
+	{"did:foo:%3A:", `invalid DID "did:foo:%3A:": illegal ':' at byte № 12`},
 
 	{"did:foo:bar:", `invalid DID "did:foo:bar:": illegal ':' at byte № 12`},
 	{"did:foo:bar:,", `invalid DID "did:foo:bar:,": illegal ',' at byte № 13`},
@@ -121,26 +129,59 @@ var GoldenDIDs = []struct {
 	did.DID
 }{
 	{
-		"",
-		did.DID{},
-	}, {
 		"did:foo:bar",
+		did.DID{Method: "foo", SpecID: "bar"},
+	}, {
+		"did:foo:b%61r",
 		did.DID{Method: "foo", SpecID: "bar"},
 	}, {
 		"did:c:str%00",
 		did.DID{Method: "c", SpecID: "str\x00"},
+	}, {
+		"did:a:b:c",
+		did.DID{Method: "a", SpecID: "b:c"},
+	}, {
+		"did:a:b%3Ac",
+		did.DID{Method: "a", SpecID: "b:c"},
+	}, {
+		"did:a::c",
+		did.DID{Method: "a", SpecID: ":c"},
+	}, {
+		"did:a:%3Ac",
+		did.DID{Method: "a", SpecID: ":c"},
+	}, {
+		"did:a:::c",
+		did.DID{Method: "a", SpecID: "::c"},
+	}, {
+		"did:h:%12:%34",
+		did.DID{Method: "h", SpecID: "\x12:\x34"},
+	}, {
+		"did:x:%3A",
+		did.DID{Method: "x", SpecID: ":"},
+	}, {
+		"did:xx::%3A",
+		did.DID{Method: "xx", SpecID: "::"},
+	}, {
+		"did:x:%3A%3A",
+		did.DID{Method: "xxx", SpecID: "::"},
 	},
 }
 
 func TestDIDString(t *testing.T) {
+	if got := new(did.DID).String(); got != "" {
+		t.Errorf("the zero value got %q, want an empty string", got)
+	}
+
 	for _, gold := range GoldenDIDs {
+		var got string
 		n := testing.AllocsPerRun(1, func() {
-			if got := gold.DID.String(); got != gold.S {
-				t.Errorf("got %q, want %q", got, gold.S)
-			}
+			got = gold.DID.String()
 		})
-		if n > 1 {
-			t.Errorf("%s did %f memory allocations, want at most 1", gold.S, n)
+		if n != 1 {
+			t.Errorf("%#v String did %f memory allocations, want 1", gold.DID, n)
+		}
+		if !gold.DID.Equal(got) {
+			t.Errorf("%#v String got %q, want Equal to self", gold.DID, got)
 		}
 	}
 }
@@ -333,6 +374,36 @@ var GoldenURLs = []struct {
 			},
 		},
 	},
+
+	{"#", did.URL{}},
+	{"?", did.URL{}},
+	{"?#", did.URL{}},
+
+	{".", did.URL{RawPath: "."}},
+	{"./", did.URL{RawPath: "./"}},
+	{"./..", did.URL{RawPath: "./.."}},
+	{"./../", did.URL{RawPath: "./../"}},
+	{"./../...", did.URL{RawPath: "./../..."}},
+	{".#", did.URL{RawPath: "."}},
+	{"./#", did.URL{RawPath: "./"}},
+	{"./..#", did.URL{RawPath: "./.."}},
+	{"./../#", did.URL{RawPath: "./../"}},
+	{"./../...#", did.URL{RawPath: "./../..."}},
+	{".?", did.URL{RawPath: "."}},
+	{"./?", did.URL{RawPath: "./"}},
+	{"./..?", did.URL{RawPath: "./.."}},
+	{"./../?", did.URL{RawPath: "./../"}},
+	{"./../...?", did.URL{RawPath: "./../..."}},
+
+	{"did", did.URL{RawPath: "did"}},
+	{"did/", did.URL{RawPath: "did/"}},
+	{"did/a", did.URL{RawPath: "did/a"}},
+	{"/did:a", did.URL{RawPath: "/did:a"}},
+	{"/did:a/", did.URL{RawPath: "/did:a/"}},
+	{"/did:a/did", did.URL{RawPath: "/did:a/did"}},
+
+	{"?foo=bar", did.URL{Query: url.Values{"foo": []string{"bar"}}}},
+	{"#foo", did.URL{Fragment: "foo"}},
 }
 
 func TestParseURL(t *testing.T) {

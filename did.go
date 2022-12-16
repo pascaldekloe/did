@@ -70,6 +70,11 @@ func (e *SyntaxError) Unwrap() error {
 // Parse validates s in full. It returns the mapping if, and only if s conforms
 // to the DID syntax specification. Errors will be of type *SyntaxError.
 func Parse(s string) (DID, error) {
+	for i := range prefix {
+		if i >= len(s) || s[i] != prefix[i] {
+			return DID{}, &SyntaxError{S: s, I: i}
+		}
+	}
 	method, err := readMethodName(s)
 	if err != nil {
 		return DID{}, err
@@ -82,12 +87,6 @@ func Parse(s string) (DID, error) {
 }
 
 func readMethodName(s string) (string, error) {
-	for i := range prefix {
-		if i >= len(s) || s[i] != prefix[i] {
-			return "", &SyntaxError{S: s, I: i}
-		}
-	}
-
 	for i := len(prefix); i < len(s); i++ {
 		switch s[i] {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -114,11 +113,17 @@ func readMethodName(s string) (string, error) {
 // ParseSpecID reads s[offset:], and returns the method-specific identifier fully escaped.
 func parseSpecID(s string, offset int) (specID string, end int) {
 	i := offset
+	if i >= len(s) {
+		return "", i
+	}
 
 NoEscapes:
 	for {
 		if i >= len(s) {
-			// best-case scenario
+			// must match: *( *idchar ":" ) 1*idchar
+			if end := len(s) - 1; s[end] == ':' {
+				return s[offset:end], end
+			}
 			return s[offset:], len(s)
 		}
 
@@ -128,18 +133,13 @@ NoEscapes:
 			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
 			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-			'.', '-', '_':
-			i++ // valid
+			'.', '-', '_',
+			':':
+			// colon not allowed as last character check delayed
+			i++
 
 		case '%':
 			break NoEscapes
-
-		case ':':
-			// must match: *( *idchar ":" ) 1*idchar
-			if i == len(s)-1 {
-				return "", i
-			}
-			i++
 
 		default:
 			// illegal character
@@ -159,15 +159,9 @@ NoEscapes:
 			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
 			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-			'.', '-', '_':
-			b.WriteByte(s[i])
-			i++
-
-		case ':':
-			// must match: *( *idchar ":" ) 1*idchar
-			if i == len(s)-1 {
-				return "", i
-			}
+			'.', '-', '_',
+			':':
+			// colon not allowed as last character check delayed
 			b.WriteByte(s[i])
 			i++
 
@@ -185,7 +179,12 @@ NoEscapes:
 		}
 	}
 
-	return b.String(), len(s)
+	specID = b.String()
+	// must match: *( *idchar ":" ) 1*idchar
+	if end := len(s) - 1; s[end] != ':' {
+		return specID, len(s)
+	}
+	return specID[:len(specID)-1], len(s) - 1
 }
 
 // Equal returns whether s compares equal to d. The method is compliant with the
@@ -343,90 +342,118 @@ type URL struct {
 
 // ParseURL validates s in full. It returns the mapping if, and only if s
 // conforms to the DID URL syntax specification. Errors will be of type
-// *SyntaxError.
+// *SyntaxError. ⚠️ Note that the URL can be IsRelative.
 func ParseURL(s string) (*URL, error) {
-	method, err := readMethodName(s)
-	if err != nil {
-		return nil, err
+	if s == "" {
+		return nil, &SyntaxError{}
 	}
+	var u URL // result
+	var i int // s index
 
-	specID, end := parseSpecID(s, len(prefix)+len(method)+1)
-	u := URL{DID: DID{Method: method, SpecID: specID}}
-	if end >= len(s) {
-		if specID == "" {
-			return nil, &SyntaxError{S: s, I: len(s)}
-		}
-
-		// no query and/or fragment
-		return &u, nil
-	}
-
-	switch s[end] {
-	default:
-		return nil, &SyntaxError{S: s, I: end}
-
-	case '#', '?':
-		break // good
-
-	case '/':
-		offset := end
-		u.RawPath, err = readPath(s, offset)
+	if len(s) >= len(prefix) && s[:len(prefix)] == prefix {
+		// has "did:" scheme
+		method, err := readMethodName(s)
 		if err != nil {
 			return nil, err
 		}
-		end += len(u.RawPath)
-		if end >= len(s) {
+		u.Method = method
+
+		u.SpecID, i = parseSpecID(s, len(prefix)+len(method)+1)
+		if u.SpecID == "" {
+			return nil, &SyntaxError{S: s, I: i}
+		}
+		if i >= len(s) {
+			// no query and/or fragment
 			return &u, nil
 		}
-	}
-	// got URL fragment and/or query in s[end:]
-
-	p, err := url.Parse(s[end:])
-	if err != nil {
-		var wrap *url.Error // not usefull
-		if errors.As(err, &wrap) {
-			err = wrap.Err // trim
-		}
-		return nil, &SyntaxError{S: s, I: -1, err: err}
-	}
-	u.Fragment = p.Fragment
-	if p.RawQuery != "" {
-		u.Query = p.Query()
-	}
-	return &u, nil
-}
-
-func readPath(s string, offset int) (string, error) {
-	for i := offset; i < len(s); i++ {
 		switch s[i] {
-		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+		case '/', '?', '#':
+			break // URL additions
+		default:
+			return nil, &SyntaxError{S: s, I: i}
+		}
+	} else {
+		// could be either another scheme or a relative URL
+		for i, c := range s {
+			// “A path segment that contains a colon character
+			// (e.g., "this:that") cannot be used as the first
+			// segment of a relative-path reference, as it would
+			// be mistaken for a scheme name.”
+			// — “URI: Generic Syntax” RFC 3986, subsection 4.2
+			switch c {
+			case ':':
+				return nil, &SyntaxError{S: s, I: i, err: errors.New("no \"did:\" scheme")}
+			default:
+				continue
+
+			case '/', '?', '#':
+				// s is a relative URL
+				break
+			}
+			break
+		}
+	}
+
+	// Parse “Path” from “URI: Generic Syntax” RFC 3986, subsection 3.3.
+	pathOffset := i
+	for ; i < len(s); i++ {
+		switch s[i] {
+		// match path BNF excluding pct-encoded
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // unreserved
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // unreserved
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', // unreserved
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // unreserved
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', // unreserved
 			'-', '.', '_', '~', // unreserved
 			'!', '$', '&', '\'', '(', ')', '*', '+', ',', ';', '=', // sub-delims
-			':', '@': // path specific
-			continue // valid
+			':', '@', // pchar additions
+			'/':
+			continue
 
-		case '#', '?':
-			// “The path is terminated by the first question mark
-			// ("?") or number sign ("#") character, or by the end
-			// of the URI.”
-			// — “URI: Generic Syntax” RFC 3986, subsection 3.3
-			return s[offset:i], nil
-
+		// match pct-encoded BNF
 		case '%':
 			_, err := parseHex(s, i+1)
 			if err != nil {
-				return "", err
+				return nil, err
 			}
 			i += 2
+
+		// “The path is terminated by the first question mark ("?") or
+		// number sign ("#") character, or by the end of the URI.”
+		case '#', '?':
+			u.RawPath = s[pathOffset:i]
+
+			// https://github.com/pascaldekloe/did/issues/2
+			p, err := url.Parse(s[i:])
+			if err != nil {
+				var wrap *url.Error // not usefull
+				if errors.As(err, &wrap) {
+					err = wrap.Err // trim
+				}
+				return nil, &SyntaxError{S: s, I: -1, err: err}
+			}
+
+			u.Fragment = p.Fragment
+			if p.RawQuery != "" {
+				u.Query = p.Query()
+			}
+			return &u, nil
+
+		default:
+			return nil, &SyntaxError{S: s, I: i}
 		}
 	}
-
-	return s[offset:], nil
+	u.RawPath = s[pathOffset:]
+	return &u, nil
 }
+
+// IsRelative returns whether u has a .DID component.
+//
+// “A relative DID URL is any URL value in a DID document that does not start
+// with did:<method-name>:<method-specific-id>. More specifically, it is any URL
+// value that does not start with the ABNF defined in 3.1 DID Syntax. The URL is
+// expected to reference a resource in the same DID document.”
+func (u *URL) IsRelative() bool { return u.Method == "" && u.SpecID == "" }
 
 // Equal returns whether s compares equal to u. The method is compliant with the
 // “Normalization and Comparison” rules as defined by RFC 3986, section 6.
@@ -539,22 +566,29 @@ func (u *URL) queryEqual(p *url.URL) bool {
 	return true
 }
 
-// GoURL returns a mapping to the Go model.
+// GoURL returns a mapping to the Go model. Note that DID URLs go into .Opaque.
+// In contrast, the IsRelative URLs use .Path instead, and without the .Scheme.
 func (u *URL) GoURL() *url.URL {
-	var pathSep string
-	if u.RawPath != "" && u.RawPath[0] != '/' {
-		pathSep = "/"
+	g := url.URL{Fragment: u.Fragment}
+
+	if u.IsRelative() {
+		g.RawPath = u.RawPath
+		g.Path, _ = url.PathUnescape(u.RawPath)
+	} else {
+		g.Scheme = "did"
+		g.Opaque = u.Method + ":" + u.SpecID
+		if u.RawPath != "" {
+			if u.RawPath[0] != '/' {
+				g.Opaque += "/"
+			}
+			g.Opaque += u.RawPath
+		}
 	}
 
-	p := &url.URL{
-		Scheme:   "did",
-		Opaque:   u.Method + ":" + u.SpecID + pathSep + u.RawPath,
-		Fragment: u.Fragment,
-	}
 	if len(u.Query) != 0 {
-		p.RawQuery = u.Query.Encode()
+		g.RawQuery = u.Query.Encode()
 	}
-	return p
+	return &g
 }
 
 // String returns the DID URL, with the empty string for the zero value. Any and
