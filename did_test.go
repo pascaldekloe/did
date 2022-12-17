@@ -54,6 +54,61 @@ func ExampleParse_percentEncoding() {
 	// string: did:example:escaped%F0%9F%A4%96
 }
 
+var GoldenDIDs = []struct {
+	S string
+	did.DID
+}{
+	{
+		"did:foo:bar",
+		did.DID{Method: "foo", SpecID: "bar"},
+	}, {
+		"did:foo:b%61r",
+		did.DID{Method: "foo", SpecID: "bar"},
+	}, {
+		"did:c:str%00",
+		did.DID{Method: "c", SpecID: "str\x00"},
+	}, {
+		"did:a:b:c",
+		did.DID{Method: "a", SpecID: "b:c"},
+	}, {
+		"did:a:b%3Ac",
+		did.DID{Method: "a", SpecID: "b:c"},
+	}, {
+		"did:a::c",
+		did.DID{Method: "a", SpecID: ":c"},
+	}, {
+		"did:a:%3Ac",
+		did.DID{Method: "a", SpecID: ":c"},
+	}, {
+		"did:a:::c",
+		did.DID{Method: "a", SpecID: "::c"},
+	}, {
+		"did:h:%12:%34",
+		did.DID{Method: "h", SpecID: "\x12:\x34"},
+	}, {
+		"did:x:%3A",
+		did.DID{Method: "x", SpecID: ":"},
+	}, {
+		"did:xx::%3A",
+		did.DID{Method: "xx", SpecID: "::"},
+	}, {
+		"did:xxx:%3A%3A",
+		did.DID{Method: "xxx", SpecID: "::"},
+	},
+}
+
+func TestParse(t *testing.T) {
+	for _, gold := range GoldenDIDs {
+		d, err := did.Parse(gold.S)
+		switch{
+		case err != nil:
+			t.Errorf("%s got error: %s", gold.S, err)
+		case d != gold.DID:
+			t.Errorf("%s got %#v, want %#v", gold.S, d, gold.DID)
+		}
+	}
+}
+
 var GoldenDIDErrors = []struct{ DID, Err string }{
 	{"urn:issn:0-670-85668-1", `invalid DID "urn:issn:0-670-85668-1": no "did:" scheme`},
 	{"bitcoin:mjSk1Ny9spzU2fouzYgLqGUD8U41iR35QN?amount=100", `invalid DID "bitcoin:mjSk1Ny9spzU2fouzYgLqGUD8U41iR35QN?amount=100": no "did:" scheme`},
@@ -122,49 +177,6 @@ func FuzzParse(f *testing.F) {
 			t.Errorf("got not a SyntaxError: %s", err)
 		}
 	})
-}
-
-var GoldenDIDs = []struct {
-	S string
-	did.DID
-}{
-	{
-		"did:foo:bar",
-		did.DID{Method: "foo", SpecID: "bar"},
-	}, {
-		"did:foo:b%61r",
-		did.DID{Method: "foo", SpecID: "bar"},
-	}, {
-		"did:c:str%00",
-		did.DID{Method: "c", SpecID: "str\x00"},
-	}, {
-		"did:a:b:c",
-		did.DID{Method: "a", SpecID: "b:c"},
-	}, {
-		"did:a:b%3Ac",
-		did.DID{Method: "a", SpecID: "b:c"},
-	}, {
-		"did:a::c",
-		did.DID{Method: "a", SpecID: ":c"},
-	}, {
-		"did:a:%3Ac",
-		did.DID{Method: "a", SpecID: ":c"},
-	}, {
-		"did:a:::c",
-		did.DID{Method: "a", SpecID: "::c"},
-	}, {
-		"did:h:%12:%34",
-		did.DID{Method: "h", SpecID: "\x12:\x34"},
-	}, {
-		"did:x:%3A",
-		did.DID{Method: "x", SpecID: ":"},
-	}, {
-		"did:xx::%3A",
-		did.DID{Method: "xx", SpecID: "::"},
-	}, {
-		"did:xxx:%3A%3A",
-		did.DID{Method: "xxx", SpecID: "::"},
-	},
 }
 
 func TestDIDString(t *testing.T) {
