@@ -714,5 +714,8 @@ func TestURLVersionParams(t *testing.T) {
 		if !vTime.Equal(want) {
 			t.Errorf("%s got time %s, want %s", sample, vTime, want)
 		}
+		if name, _ := vTime.Zone(); name != "UTC" {
+			t.Errorf("%s got time zone %q, want UTC", sample, name)
+		}
 	})
 }
