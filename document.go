@@ -60,19 +60,19 @@ type Document struct {
 	Services []*Service `json:"service,omitempty"`
 }
 
-// VerificationMethodOrNil returns the VerificationMethods match if any, with
-// nil for not found.
-//
-// Duplicate URL query-parameters are compared in order of their respective
-// appearance, i.e., "?foo=1&foo=2" is not equal to "?foo=2&foo=1".
+// VerificationMethodOrNil returns a VerificationMethods match, if any, with nil
+// for not found. The lookup searches for ID equivalence with u, conform the
+// “Normalization and Comparison” rules from RFC 3986, section 6, including the
+// path logic of path.Clean. Duplicate query-parameters are compared in order of
+// their appearance, i.e., "?foo=1&foo=2" is not equivalent to "?foo=2&foo=1".
 func (doc *Document) VerificationMethodOrNil(u *URL) *VerificationMethod {
-	d := &u.DID
+	base := &u.DID
 	if u.IsRelative() {
-		d = &doc.Subject
+		base = &doc.Subject
 	}
 
 	for _, m := range doc.VerificationMethods {
-		if m.ID.Fragment == u.Fragment && m.ID.DID == *d && pathEqual(m.ID.RawPath, u.RawPath) && queryEqual(m.ID.Query, u.Query) {
+		if m.ID.Fragment == u.Fragment && m.ID.DID == *base && pathEqual(m.ID.RawPath, u.RawPath) && queryEqual(m.ID.Query, u.Query) {
 			return m
 		}
 	}

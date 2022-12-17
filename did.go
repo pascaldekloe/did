@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 )
@@ -455,11 +456,10 @@ func ParseURL(s string) (*URL, error) {
 // expected to reference a resource in the same DID document.”
 func (u *URL) IsRelative() bool { return u.Method == "" && u.SpecID == "" }
 
-// Equal returns whether s compares equal to u. The method is compliant with the
-// “Normalization and Comparison” rules as defined by RFC 3986, section 6.
-//
-// Duplicate URL query-parameters are compared in order of their respective
-// appearance, i.e., "?foo=1&foo=2" is not equal to "?foo=2&foo=1".
+// Equal returns whether s is equivalent to u. The method is compliant with the
+// “Normalization and Comparison” rules from RFC 3986, section 6, including the
+// path logic of path.Clean. Duplicate query-parameters are compared in order of
+// their appearance, i.e., "?foo=1&foo=2" is not equivalent to "?foo=2&foo=1".
 func (u *URL) Equal(s string) bool {
 	for i := 0; i < len(s); i++ {
 		switch s[i] {
@@ -484,21 +484,16 @@ func (u *URL) Equal(s string) bool {
 }
 
 func pathEqual(a, b string) bool {
-	// fast path
 	if a == b {
 		return true
 	}
-
 	if a == "" || b == "" {
 		return false
 	}
-	// trim root
-	if a[0] == '/' {
-		a = a[1:]
-	}
-	if b[0] == '/' {
-		b = b[1:]
-	}
+
+	// normalize without root
+	a = path.Join("/", a)[1:]
+	b = path.Join("/", b)[1:]
 
 	for {
 		switch {
