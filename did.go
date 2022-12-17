@@ -188,49 +188,59 @@ NoEscapes:
 	return specID[:len(specID)-1], len(s) - 1
 }
 
-// Equal returns whether s compares equal to d. The method is compliant with the
-// “Normalization and Comparison” rules as defined by RFC 3986, section 6.
+// Equal returns whether s is equivalent to d, in addition to a valid syntax.
+// The method is compliant with the “Normalization and Comparison” rules from
+// RFC 3986, section 6.
 func (d DID) Equal(s string) bool {
 	// scheme compare
 	if len(s) < len(prefix) || s[:len(prefix)] != prefix {
 		return false
 	}
-	s = s[len(prefix):] // pass
 
 	// method compare
-	if l := len(d.Method); l >= len(s) || s[l] != ':' || s[:l] != d.Method {
+	method, err := readMethodName(s)
+	if err != nil || method != d.Method {
 		return false
 	}
-	s = s[len(d.Method)+1:] // pass
 
-	// method-specific identifier compare includes percent-encoding
-	for i := 0; i < len(d.SpecID); i++ {
-		c := d.SpecID[i]
+	// method-specific identifier compare
+	i := len(prefix) + len(method) + 1
+	for j := 0; j < len(d.SpecID); j++ {
+		c := d.SpecID[j]
 
-		if s == "" {
+		if i >= len(s) {
 			return false
 		}
-		switch s[0] {
+
+		switch s[i] {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z':
-			if s[0] != c {
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+			'.', '-', '_':
+			if s[i] != c {
 				return false
 			}
-			s = s[1:] // pass
+			i++
+
+		case ':':
+			// colon not allowed as last character
+			if s[i] != c || j == len(d.SpecID)-1 {
+				return false
+			}
+			i++
 
 		case '%':
-			v, err := parseHex(s, 1)
+			v, err := parseHex(s, i+1)
 			if err != nil || v != c {
 				return false
 			}
-			s = s[3:] // pass
+			i += 3
 
 		default:
 			return false // invalid
 		}
 	}
-	return s == ""
+	return i >= len(s) // compared all
 }
 
 // ResolveReference resolves URI reference r to an absolute URI from base URI d,
@@ -456,10 +466,11 @@ func ParseURL(s string) (*URL, error) {
 // expected to reference a resource in the same DID document.”
 func (u *URL) IsRelative() bool { return u.Method == "" && u.SpecID == "" }
 
-// Equal returns whether s is equivalent to u. The method is compliant with the
-// “Normalization and Comparison” rules from RFC 3986, section 6, including the
-// path logic of path.Clean. Duplicate query-parameters are compared in order of
-// their appearance, i.e., "?foo=1&foo=2" is not equivalent to "?foo=2&foo=1".
+// Equal returns whether s is equivalent to u, in addition to a valid syntax.
+// The method is compliant with the “Normalization and Comparison” rules from
+// RFC 3986, section 6, including the path logic of path.Clean. Any duplicate
+// query-parameters are compared in order of their appearance, i.e.,
+// "?foo=1&foo=2" is not equivalent to "?foo=2&foo=1".
 func (u *URL) Equal(s string) bool {
 	for i := 0; i < len(s); i++ {
 		switch s[i] {

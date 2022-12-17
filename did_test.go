@@ -162,7 +162,7 @@ var GoldenDIDs = []struct {
 		"did:xx::%3A",
 		did.DID{Method: "xx", SpecID: "::"},
 	}, {
-		"did:x:%3A%3A",
+		"did:xxx:%3A%3A",
 		did.DID{Method: "xxx", SpecID: "::"},
 	},
 }
@@ -233,6 +233,12 @@ var DIDEquals = [][]string{
 }
 
 func TestDIDEqual(t *testing.T) {
+	for _, gold := range GoldenDIDs {
+		if !gold.DID.Equal(gold.S) {
+			t.Errorf("%#v did not equal %q", gold.DID, gold.S)
+		}
+	}
+
 	for i, equals := range DIDEquals {
 		for _, s := range equals {
 			d, err := did.Parse(s)
