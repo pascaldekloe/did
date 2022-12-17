@@ -146,7 +146,7 @@ func TestDocControllersJSON(t *testing.T) {
 	}
 
 	const want = "did:example:bcehfew7h32f32h7af3"
-	if len(doc.Controllers) != 1 || !doc.Controllers.Contains(want) {
+	if len(doc.Controllers) != 1 || !doc.Controllers.ContainsString(want) {
 		t.Errorf("got controllers %q, want [%q]", doc.Controllers, want)
 	}
 }

@@ -82,10 +82,10 @@ func (doc *Document) VerificationMethodOrNil(u *URL) *VerificationMethod {
 // Set represents a string, or a set of strings that confrom to the DID syntax.
 type Set []DID
 
-// Contains returns whether any of the set entries equal s.
-func (set Set) Contains(s string) bool {
+// ContainsString returns whether any of the set entries EqualString s.
+func (set Set) ContainsString(s string) bool {
 	for _, d := range set {
-		if d.Equal(s) {
+		if d.EqualString(s) {
 			return true
 		}
 	}

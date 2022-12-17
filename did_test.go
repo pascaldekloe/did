@@ -192,8 +192,8 @@ func TestDIDString(t *testing.T) {
 		if n != 1 {
 			t.Errorf("%#v String did %f memory allocations, want 1", gold.DID, n)
 		}
-		if !gold.DID.Equal(got) {
-			t.Errorf("%#v String got %q, want Equal to self", gold.DID, got)
+		if !gold.DID.EqualString(got) {
+			t.Errorf("%#v String got %q, want EqualString to self", gold.DID, got)
 		}
 	}
 }
@@ -244,9 +244,9 @@ var DIDEquals = [][]string{
 	},
 }
 
-func TestDIDEqual(t *testing.T) {
+func TestDIDEqualString(t *testing.T) {
 	for _, gold := range GoldenDIDs {
-		if !gold.DID.Equal(gold.S) {
+		if !gold.DID.EqualString(gold.S) {
 			t.Errorf("%#v got false for %q, want true", gold.DID, gold.S)
 		}
 	}
@@ -264,9 +264,9 @@ func TestDIDEqual(t *testing.T) {
 
 				// compare each entry, including self
 				for _, e := range equals {
-					got := d.Equal(e)
+					got := d.EqualString(e)
 					if got != want {
-						t.Errorf("Parse(%q) Equal(%q) got %t, want %t\nparsed as %#v", s, e, got, want, d)
+						t.Errorf("Parse(%q) EqualString(%q) got %t, want %t\nparsed as %#v", s, e, got, want, d)
 					}
 				}
 			}
@@ -543,9 +543,9 @@ var URLEquals = func() [][]string {
 	return groups
 }()
 
-func TestURLEqual(t *testing.T) {
+func TestURLEqualString(t *testing.T) {
 	for _, gold := range GoldenURLs {
-		got := gold.URL.Equal(gold.S)
+		got := gold.URL.EqualString(gold.S)
 		if gold.URL.IsRelative() {
 			if got {
 				t.Errorf("%#v got true for relative %q, want false", gold.URL, gold.S)
@@ -570,9 +570,9 @@ func TestURLEqual(t *testing.T) {
 
 				// compare each entry, including self
 				for _, e := range equals {
-					got := u.Equal(e)
+					got := u.EqualString(e)
 					if got != want {
-						t.Errorf("ParseURL(%q) Equal(%q) got %t, want %t\nparsed as %#v", s, e, got, want, u)
+						t.Errorf("ParseURL(%q) EqualString(%q) got %t, want %t\nparsed as %#v", s, e, got, want, u)
 					}
 				}
 			}

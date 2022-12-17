@@ -188,10 +188,10 @@ NoEscapes:
 	return specID[:len(specID)-1], len(s) - 1
 }
 
-// Equal returns whether s is equivalent to d, in addition to a valid syntax.
-// The method is compliant with the “Normalization and Comparison” rules from
-// RFC 3986, section 6.
-func (d DID) Equal(s string) bool {
+// EqualString returns whether s conforms to the DID syntax, and whether it is
+// equivalent to d according to the “Normalization and Comparison” rules of RFC
+// 3986, section 6.
+func (d DID) EqualString(s string) bool {
 	// scheme compare
 	if len(s) < len(prefix) || s[:len(prefix)] != prefix {
 		return false
@@ -468,21 +468,21 @@ func ParseURL(s string) (*URL, error) {
 // expected to reference a resource in the same DID document.”
 func (u *URL) IsRelative() bool { return u.Method == "" && u.SpecID == "" }
 
-// Equal returns whether s is equivalent to u, in addition to a valid syntax.
-// The method is compliant with the “Normalization and Comparison” rules from
-// RFC 3986, section 6, including the path logic of path.Clean. Any duplicate
-// query-parameters are compared in order of their appearance, i.e.,
+// EqualString returns whether s conforms to the DID URL syntax, and whether it
+// is equivalent to u according to the “Normalization and Comparison” rules of
+// RFC 3986, section 6. Path comparison follows the logic of path.Clean.
+// Duplicate query-parameters are compared in order of their appearance, i.e.,
 // "?foo=1&foo=2" is not equivalent to "?foo=2&foo=1".
 //
 // Relative URLs never compare equal. RFC 3986, subection 6.1, states “In
 // testing for equivalence, applications should not directly compare relative
 // references; the references should be converted to their respective target
 // URIs before comparison.”.
-func (u *URL) Equal(s string) bool {
+func (u *URL) EqualString(s string) bool {
 	for i := 0; i < len(s); i++ {
 		switch s[i] {
 		case '/', '?', '#':
-			if !u.DID.Equal(s[:i]) {
+			if !u.DID.EqualString(s[:i]) {
 				return false
 			}
 
@@ -498,7 +498,7 @@ func (u *URL) Equal(s string) bool {
 		}
 	}
 
-	return u.RawPath == "" && len(u.Query) == 0 && u.Fragment == "" && u.DID.Equal(s)
+	return u.RawPath == "" && len(u.Query) == 0 && u.Fragment == "" && u.DID.EqualString(s)
 }
 
 func pathEqual(a, b string) bool {
