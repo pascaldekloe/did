@@ -343,7 +343,9 @@ func (d *DID) UnmarshalJSON(bytes []byte) error {
 	return nil
 }
 
-// URL holds all attributes of a DID URL.
+// URL extends the syntax of a basic DID to incorporate other standard URI
+// components such as path, query, and fragment in order to locate a particular
+// resource.
 type URL struct {
 	DID
 	RawPath  string     // optional
