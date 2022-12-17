@@ -471,6 +471,11 @@ func (u *URL) IsRelative() bool { return u.Method == "" && u.SpecID == "" }
 // RFC 3986, section 6, including the path logic of path.Clean. Any duplicate
 // query-parameters are compared in order of their appearance, i.e.,
 // "?foo=1&foo=2" is not equivalent to "?foo=2&foo=1".
+//
+// Relative URLs never compare equal. RFC 3986, subection 6.1, states “In
+// testing for equivalence, applications should not directly compare relative
+// references; the references should be converted to their respective target
+// URIs before comparison.”.
 func (u *URL) Equal(s string) bool {
 	for i := 0; i < len(s); i++ {
 		switch s[i] {

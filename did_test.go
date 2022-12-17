@@ -100,7 +100,7 @@ var GoldenDIDs = []struct {
 func TestParse(t *testing.T) {
 	for _, gold := range GoldenDIDs {
 		d, err := did.Parse(gold.S)
-		switch{
+		switch {
 		case err != nil:
 			t.Errorf("%s got error: %s", gold.S, err)
 		case d != gold.DID:
@@ -247,7 +247,7 @@ var DIDEquals = [][]string{
 func TestDIDEqual(t *testing.T) {
 	for _, gold := range GoldenDIDs {
 		if !gold.DID.Equal(gold.S) {
-			t.Errorf("%#v did not equal %q", gold.DID, gold.S)
+			t.Errorf("%#v got false for %q, want true", gold.DID, gold.S)
 		}
 	}
 
@@ -544,6 +544,19 @@ var URLEquals = func() [][]string {
 }()
 
 func TestURLEqual(t *testing.T) {
+	for _, gold := range GoldenURLs {
+		got := gold.URL.Equal(gold.S)
+		if gold.URL.IsRelative() {
+			if got {
+				t.Errorf("%#v got true for relative %q, want false", gold.URL, gold.S)
+			}
+		} else {
+			if !got {
+				t.Errorf("%#v got false for %q, want true", gold.URL, gold.S)
+			}
+		}
+	}
+
 	for i, equals := range URLEquals {
 		for _, s := range equals {
 			u, err := did.ParseURL(s)
