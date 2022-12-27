@@ -829,7 +829,8 @@ func (u *URL) VersionParams() (string, time.Time, error) {
 	}
 }
 
-// SetVersionParams installs the standardised "versionId" and "versionTime".
+// SetVersionParams installs the standardised "versionId" and "versionTime". The
+// zero value on either s or t omits the respective parameter.
 func (u *URL) SetVersionParams(s string, t time.Time) {
 	if s == "" {
 		u.Query["versionId"] = append(u.Query["versionId"][:0], s)
