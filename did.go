@@ -468,9 +468,25 @@ func ParseURL(s string) (*URL, error) {
 // expected to reference a resource in the same DID document.”
 func (u *URL) IsRelative() bool { return u.Method == "" && u.SpecID == "" }
 
+// Equal returns whether v is equivalent to u according to the “Normalization
+// and Comparison” rules of RFC 3986, section 6. Path evaluation follows the
+// logic of path.Clean. Duplicate query-parameters are compared in order of
+// their appearance, i.e., "?foo=1&foo=2" is not equivalent to "?foo=2&foo=1".
+//
+// Relative URLs never compare equal. RFC 3986, subection 6.1, states “In
+// testing for equivalence, applications should not directly compare relative
+// references; the references should be converted to their respective target
+// URIs before comparison.”.
+func (u *URL) Equal(v *URL) bool {
+	return v.Fragment == u.Fragment &&
+		!v.IsRelative() && v.DID == u.DID &&
+		pathEqual(v.RawPath, u.RawPath) &&
+		queryEqual(v.Query, u.Query)
+}
+
 // EqualString returns whether s conforms to the DID URL syntax, and whether it
 // is equivalent to u according to the “Normalization and Comparison” rules of
-// RFC 3986, section 6. Path comparison follows the logic of path.Clean.
+// RFC 3986, section 6. Path evaluation follows the logic of path.Clean.
 // Duplicate query-parameters are compared in order of their appearance, i.e.,
 // "?foo=1&foo=2" is not equivalent to "?foo=2&foo=1".
 //
