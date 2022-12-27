@@ -499,7 +499,7 @@ func (srv *Service) UnmarshalJSON(bytes []byte) error {
 // specification.
 type ServiceEndpoint struct {
 	URIRefs []string
-	Objects []json.RawMessage
+	Maps    []json.RawMessage // JSON objects
 }
 
 var errNoServiceEndpoint = errors.New("no DID service endpoint set")
@@ -507,19 +507,19 @@ var errNoServiceEndpoint = errors.New("no DID service endpoint set")
 // MarshalJSON implements the json.Marshaler interface.
 func (e ServiceEndpoint) MarshalJSON() ([]byte, error) {
 	switch {
-	case len(e.URIRefs) == 0 && len(e.Objects) == 0:
+	case len(e.URIRefs) == 0 && len(e.Maps) == 0:
 		return nil, errNoServiceEndpoint
-	case len(e.URIRefs) == 1 && len(e.Objects) == 0:
+	case len(e.URIRefs) == 1 && len(e.Maps) == 0:
 		return json.Marshal(e.URIRefs[0])
-	case len(e.URIRefs) == 0 && len(e.Objects) == 1:
-		return e.Objects[0], nil
+	case len(e.URIRefs) == 0 && len(e.Maps) == 1:
+		return e.Maps[0], nil
 	}
 
 	bytes, err := json.Marshal(e.URIRefs)
 	if err != nil {
 		return nil, err
 	}
-	for _, raw := range e.Objects {
+	for _, raw := range e.Maps {
 		bytes[len(bytes)-1] = ',' // flip array end
 		bytes = append(bytes, raw...)
 		bytes = append(bytes, ']') // new array end
@@ -531,7 +531,7 @@ func (e ServiceEndpoint) MarshalJSON() ([]byte, error) {
 func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
 	// reset
 	e.URIRefs = e.URIRefs[:0]
-	e.Objects = e.Objects[:0]
+	e.Maps = e.Maps[:0]
 
 	switch bytes[0] {
 	case '"': // single string
@@ -543,13 +543,13 @@ func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
 		return json.Unmarshal(bytes, &e.URIRefs[0])
 
 	case '{': // single map
-		if cap(e.Objects) != 0 {
-			e.Objects = e.Objects[:1]
+		if cap(e.Maps) != 0 {
+			e.Maps = e.Maps[:1]
 		} else {
-			e.Objects = make([]json.RawMessage, 1)
+			e.Maps = make([]json.RawMessage, 1)
 		}
-		e.Objects[0] = make(json.RawMessage, len(bytes))
-		copy(e.Objects[0], bytes)
+		e.Maps[0] = make(json.RawMessage, len(bytes))
+		copy(e.Maps[0], bytes)
 		return nil
 
 	case '[': // set composed of one or more strings and/or maps.
@@ -577,7 +577,7 @@ func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
 			}
 			e.URIRefs = append(e.URIRefs, s)
 		case '{':
-			e.Objects = append(e.Objects, raw)
+			e.Maps = append(e.Maps, raw)
 		default:
 			return fmt.Errorf("DID serviceEndpoint JSON set entry is not a string nor a map: %.12q", raw)
 		}

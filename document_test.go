@@ -309,7 +309,7 @@ func TestServiceUnmarshalJSON(t *testing.T) {
 	if got := doc.Services[0].Endpoint.URIRefs; len(got) != 1 || got[0] != wantEndpoint {
 		t.Errorf("got service endpoint strings %q, want [%q]", got, wantEndpoint)
 	}
-	if got := doc.Services[0].Endpoint.Objects; len(got) != 0 {
+	if got := doc.Services[0].Endpoint.Maps; len(got) != 0 {
 		t.Errorf("got service endpoint maps %q, want none", got)
 	}
 }
