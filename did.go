@@ -603,12 +603,12 @@ func queryEqual(a, b url.Values) bool {
 func (u *URL) GoURL() *url.URL {
 	g := url.URL{Fragment: u.Fragment}
 
-	if u.IsRelative() {
+	if s := u.DID.String(); s == "" {
 		g.RawPath = u.RawPath
 		g.Path, _ = url.PathUnescape(u.RawPath)
 	} else {
-		g.Scheme = "did"
-		g.Opaque = u.Method + ":" + u.SpecID
+		g.Scheme = prefix[:len(prefix)-1]
+		g.Opaque = s[len(prefix):]
 		if u.RawPath != "" {
 			if u.RawPath[0] != '/' {
 				g.Opaque += "/"
