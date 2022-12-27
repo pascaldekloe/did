@@ -151,24 +151,27 @@ func TestDocControllersJSON(t *testing.T) {
 	}
 }
 
-func ExampleDocument_VerificationMethodOrNil_relativeURL() {
+func ExampleDocument_VerificationMethodRefs_relativeURL() {
 	var doc did.Document
 	err := json.Unmarshal([]byte(example9), &doc)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println("referenced verification-methods:", doc.Authentication.URIRefs)
-	if len(doc.Authentication.URIRefs) != 1 {
-		return
+
+	perURI, notFound := doc.VerificationMethodRefs()
+	if len(notFound) != 0 {
+		fmt.Println("references not found:", notFound)
 	}
 
-	m := doc.VerificationMethodOrNil(doc.Authentication.URIRefs[0])
-	if m == nil {
-		fmt.Println("referenced verification-method not found")
-		return
+	authRefs := doc.Authentication.URIRefs
+	fmt.Println("referenced verification-methods:", authRefs)
+	if len(authRefs) != 0 {
+		m := perURI[authRefs[0]]
+		if m != nil {
+			fmt.Println("public key:", m.AdditionalString("publicKeyMultibase"))
+		}
 	}
-	fmt.Println("public key:", m.AdditionalString("publicKeyMultibase"))
 	// Output:
 	// referenced verification-methods: [#key-1]
 	// public key: zH3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV

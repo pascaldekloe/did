@@ -60,23 +60,68 @@ type Document struct {
 	Services []*Service `json:"service,omitempty"`
 }
 
-// VerificationMethodOrNil returns a VerificationMethods match, if any, with nil
-// for not found. The lookup searches for ID equivalence with u, conform the
-// “Normalization and Comparison” rules from RFC 3986, section 6, including the
-// path logic of path.Clean. Duplicate query-parameters are compared in order of
-// their appearance, i.e., "?foo=1&foo=2" is not equivalent to "?foo=2&foo=1".
-func (doc *Document) VerificationMethodOrNil(u *URL) *VerificationMethod {
-	base := &u.DID
-	if u.IsRelative() {
-		base = &doc.Subject
+// VerificationMethodRefs returns each VerificationRelationship.URIRefs pointer
+// either mapped to its match within doc or as a notFound element. “This is done
+// by dereferencing the URL and searching the resulting resource for a
+// verification method map with an id property whose value matches the URL.”
+//
+// When not found, then the verification method will need to be retrieved from
+// another DID document. Not found is deduplicated pointer wise. However, both
+// perURI and notFound may still contain URL duplicates because two pointers can
+// still refer to structs with either the same URL or an equivalent URL.
+func (doc *Document) VerificationMethodRefs() (perURI map[*URL]*VerificationMethod, notFound []*URL) {
+	relationships := [...]*VerificationRelationship{
+		doc.Authentication,
+		doc.AssertionMethod,
+		doc.KeyAgreement,
+		doc.CapabilityInvocation,
+		doc.CapabilityDelegation,
 	}
 
-	for _, m := range doc.VerificationMethods {
-		if m.ID.Fragment == u.Fragment && m.ID.DID == *base && pathEqual(m.ID.RawPath, u.RawPath) && queryEqual(m.ID.Query, u.Query) {
-			return m
+	// total number of references (including dupes possibly)
+	var refN int
+	for _, r := range relationships {
+		if r != nil {
+			refN += len(r.URIRefs)
 		}
 	}
-	return nil
+	perURI = make(map[*URL]*VerificationMethod, refN)
+
+	for _, r := range relationships {
+		if r == nil {
+			continue
+		}
+	MatchRefs:
+		for _, u := range r.URIRefs {
+			// omit pointer duplicates
+			if _, ok := perURI[u]; ok {
+				continue
+			}
+			for _, p := range notFound {
+				if p == u {
+					continue MatchRefs
+				}
+			}
+
+			// resolve against DID document "id" when relative
+			base := &u.DID
+			if u.IsRelative() {
+				base = &doc.Subject
+			}
+
+			// evaluate each option
+			for _, m := range doc.VerificationMethods {
+				if m.ID.Fragment == u.Fragment && m.ID.DID == *base && pathEqual(m.ID.RawPath, u.RawPath) && queryEqual(m.ID.Query, u.Query) {
+					perURI[u] = m // found
+					continue MatchRefs
+				}
+			}
+
+			notFound = append(notFound, u)
+		}
+	}
+
+	return
 }
 
 // Set represents a string, or a set of strings that confrom to the DID syntax.
@@ -141,7 +186,7 @@ type VerificationRelationship struct {
 	Methods []*VerificationMethod
 
 	// References will need to be retrieved from elsewhere in the DID
-	// Document or from another DID Document. See VerificationMethodOrNil.
+	// Document [VerificationMethodRefs] or from another DID Document.
 	URIRefs []*URL
 }
 
