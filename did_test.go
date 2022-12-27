@@ -580,6 +580,53 @@ func TestURLEqualString(t *testing.T) {
 	}
 }
 
+func TestURLString(t *testing.T) {
+	if got := new(did.URL).String(); got != "" {
+		t.Errorf("the zero value got %q, want an empty string", got)
+	}
+
+	for _, gold := range GoldenURLs {
+		got := gold.URL.String()
+		if !gold.URL.IsRelative() && !gold.URL.EqualString(got) {
+			t.Errorf("%#v String got %q, want EqualString to self", gold.URL, got)
+		}
+	}
+}
+
+func FuzzURLString(f *testing.F) {
+	f.Fuzz(func(t *testing.T, method, specID, seg1, seg2 string, segN byte, fragment string) {
+		// omit invalid method names for fuzz test
+		if method == "" {
+			return
+		}
+		for _, r := range method {
+			if r < '0' || r > '9' && r < 'a' || r > 'z' {
+				return
+			}
+		}
+		// omit invalid method-specific identifiers for fuzz test
+		if specID == "" {
+			return
+		}
+
+		u := did.URL{DID: did.DID{Method: method, SpecID: specID}, Fragment: fragment}
+		segs := []string{seg1, seg2}
+		if int(uint(segN)) < len(segs) {
+			segs = segs[:segN]
+		}
+		u.SetPathSegments(segs...)
+		s := u.String()
+
+		u2, err := did.ParseURL(s)
+		if err != nil {
+			t.Fatalf("ParseURL error on String result %q: %s", s, err)
+		}
+		if !u2.Equal(&u) {
+			t.Fatalf("%#v became %#v after codec cycle with %q", u, u2, s)
+		}
+	})
+}
+
 func ExampleURL_PathWithEscape() {
 	u, err := did.ParseURL("did:example:123456/path%2Fesc")
 	if err != nil {
