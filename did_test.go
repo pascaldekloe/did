@@ -274,34 +274,6 @@ func TestDIDEqualString(t *testing.T) {
 	}
 }
 
-func ExampleDID_ResolveReference() {
-	base := did.DID{Method: "example", SpecID: "101"}
-	tests := []string{
-		"/hello",
-		"any?",
-		"#body",
-		"did:example:2",
-		"did:foo:bar",
-		"http://localhost:8080",
-	}
-
-	for _, t := range tests {
-		s, err := base.ResolveReference(t)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			fmt.Println("• " + s)
-		}
-	}
-	// Output:
-	// • did:example:101/hello
-	// • did:example:101/any
-	// • did:example:101#body
-	// • did:example:2
-	// • did:foo:bar
-	// • http://localhost:8080
-}
-
 var GoldenURLs = []struct {
 	S string
 	did.URL
