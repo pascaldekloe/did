@@ -174,7 +174,7 @@ func (set *Set) UnmarshalJSON(bytes []byte) error {
 		return nil
 
 	default:
-		return fmt.Errorf("DID string or a set of strings not a JSON string or array: %.12q", bytes)
+		return fmt.Errorf("JSON start %q of DID string or a set of strings is not a string nor an array nor null", bytes[0])
 	}
 }
 
@@ -192,19 +192,30 @@ type VerificationRelationship struct {
 
 // MarshalJSON implements the json.Marshaler interface.
 func (r VerificationRelationship) MarshalJSON() ([]byte, error) {
+	if len(r.Methods) == 0 && len(r.URIRefs) == 0 {
+		return []byte{'n', 'u', 'l', 'l'}, nil
+	}
+
 	// embedded methods as JSON object array
-	buf, err := json.Marshal(r.Methods)
-	if err != nil {
-		return nil, err
+	var buf []byte
+	if len(r.Methods) != 0 {
+		bytes, err := json.Marshal(r.Methods)
+		if err != nil {
+			return nil, err
+		}
+		buf = bytes
 	}
 
 	// URL refererences as JSON strings into array
 	for _, u := range r.URIRefs {
-		buf[len(buf)-1] = ',' // flip array end
+		if len(buf) == 0 {
+			buf = append(buf, '[')
+		} else {
+			buf = append(buf, ',')
+		}
 		buf = strconv.AppendQuote(buf, u.String())
-		buf = append(buf, ']') // new array end
 	}
-
+	buf = append(buf, ']')
 	return buf, nil
 }
 
@@ -222,7 +233,7 @@ func (r *VerificationRelationship) UnmarshalJSON(bytes []byte) error {
 		return nil
 
 	default:
-		return fmt.Errorf("DID set of verification methods is not a JSON array nor null: %.12q", bytes)
+		return fmt.Errorf("JSON start %q of DID set of verification methods is not an array nor null", bytes[0])
 	}
 
 	var elements []json.RawMessage
@@ -250,7 +261,7 @@ func (r *VerificationRelationship) UnmarshalJSON(bytes []byte) error {
 			r.URIRefs = append(r.URIRefs, &u)
 
 		default:
-			return fmt.Errorf("DID set of verification methods entry is not a JSON object nor a JSON string: %.12q", raw)
+			return fmt.Errorf("JSON start %q of DID set of verification methods entry is not a object nor a string", raw[0])
 		}
 	}
 
@@ -302,7 +313,7 @@ func (m *VerificationMethod) MarshalJSON() ([]byte, error) {
 	for property, value := range m.Additional {
 		switch property {
 		case "id", "type", "controller":
-			return nil, fmt.Errorf(`found core DID verification-method property %q in additional set`, property)
+			return nil, fmt.Errorf(`core DID verification-method property %q in additional set`, property)
 		}
 
 		buf = append(buf, ',')
@@ -380,8 +391,6 @@ func (srv *Service) AdditionalString(property string) string {
 	return s
 }
 
-var errNoServiceType = errors.New("no DID service type set")
-
 // MarshalJSON implements the json.Marshaler interface.
 func (srv *Service) MarshalJSON() ([]byte, error) {
 	buf := make([]byte, 0, 256)
@@ -392,7 +401,7 @@ func (srv *Service) MarshalJSON() ([]byte, error) {
 	buf = append(buf, `,"type":`...)
 	switch len(srv.Types) {
 	case 0:
-		return nil, errNoServiceType
+		return nil, errors.New("no DID service type")
 	case 1:
 		buf = strconv.AppendQuote(buf, srv.Types[0])
 	default:
@@ -417,7 +426,7 @@ func (srv *Service) MarshalJSON() ([]byte, error) {
 	for property, value := range srv.Additional {
 		switch property {
 		case "id", "type", "serviceEndpoint":
-			return nil, fmt.Errorf(`found core DID service property %q in additional set`, property)
+			return nil, fmt.Errorf(`core DID service property %q in additional set`, property)
 		}
 
 		buf = append(buf, ',')
@@ -475,8 +484,11 @@ func (srv *Service) UnmarshalJSON(bytes []byte) error {
 			if err != nil {
 				return fmt.Errorf(`DID service JSON "type": %w`, err)
 			}
+			if len(srv.Types) == 0 {
+				return errors.New(`DID service JSON "type" array empty`)
+			}
 		default:
-			return fmt.Errorf(`DID service JSON "type" is not a string nor a set of strings: %.12q`, raw)
+			return fmt.Errorf(`JSON start %q of DID service "type" is not a string nor an array`, raw[0])
 		}
 	}
 
@@ -502,13 +514,11 @@ type ServiceEndpoint struct {
 	Maps    []json.RawMessage // JSON objects
 }
 
-var errNoServiceEndpoint = errors.New("no DID service endpoint set")
-
 // MarshalJSON implements the json.Marshaler interface.
 func (e ServiceEndpoint) MarshalJSON() ([]byte, error) {
 	switch {
 	case len(e.URIRefs) == 0 && len(e.Maps) == 0:
-		return nil, errNoServiceEndpoint
+		return nil, errors.New("DID service endpoint empty")
 	case len(e.URIRefs) == 1 && len(e.Maps) == 0:
 		return json.Marshal(e.URIRefs[0])
 	case len(e.URIRefs) == 0 && len(e.Maps) == 1:
@@ -556,7 +566,7 @@ func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
 		break
 
 	default:
-		return fmt.Errorf("DID serviceEndpoint JSON is not a string nor a map nor a set: %.12q", bytes)
+		return fmt.Errorf("JSON start %q of DID serviceEndpoint is not a string nor an object nor an array", bytes[0])
 	}
 
 	var set []json.RawMessage
@@ -565,7 +575,7 @@ func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
 		return err
 	}
 	if len(set) == 0 {
-		return errors.New("DID serviceEndpoint JSON set empty")
+		return errors.New("DID serviceEndpoint JSON array empty")
 	}
 	for _, raw := range set {
 		switch raw[0] {
@@ -579,7 +589,7 @@ func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
 		case '{':
 			e.Maps = append(e.Maps, raw)
 		default:
-			return fmt.Errorf("DID serviceEndpoint JSON set entry is not a string nor a map: %.12q", raw)
+			return fmt.Errorf("JSON start %q of DID serviceEndpoint array entry is not a string nor an object", raw[0])
 		}
 	}
 	return nil
