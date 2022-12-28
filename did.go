@@ -45,6 +45,8 @@ type SyntaxError struct {
 func (e *SyntaxError) Error() string {
 	var desc string
 	switch {
+	case e.S == "":
+		return "empty DID string"
 	case e.err != nil:
 		desc = e.err.Error()
 	case e.I < 0:

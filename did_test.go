@@ -110,6 +110,8 @@ func TestParse(t *testing.T) {
 }
 
 var GoldenDIDErrors = []struct{ DID, Err string }{
+	{"", "empty DID string"},
+
 	{"urn:issn:0-670-85668-1", `invalid DID "urn:issn:0-670-85668-1": no "did:" scheme`},
 	{"bitcoin:mjSk1Ny9spzU2fouzYgLqGUD8U41iR35QN?amount=100", `invalid DID "bitcoin:mjSk1Ny9spzU2fouzYgLqGUD8U41iR35QN?amount=100": no "did:" scheme`},
 	{"http://localhost/", `invalid DID "http://localhost/": no "did:" scheme`},
@@ -423,6 +425,7 @@ func TestParseURL(t *testing.T) {
 }
 
 var GoldenURLErrors = []struct{ URL, Err string }{
+	{"", "empty DID string"},
 	{"did:foo:bar/%", `invalid DID "did:foo:bar/%": end incomplete`},
 	{"did:foo:bar/%X0", `invalid DID "did:foo:bar/%X0": illegal 'X' at byte № 14`},
 }
