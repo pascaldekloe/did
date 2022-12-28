@@ -510,7 +510,7 @@ func (srv *Service) UnmarshalJSON(bytes []byte) error {
 // rules in RFC 3986 and to any normalization rules in its applicable URI scheme
 // specification.
 type ServiceEndpoint struct {
-	URIRefs []string
+	URIRefs []*url.URL
 	Maps    []json.RawMessage // JSON objects
 }
 
@@ -520,21 +520,33 @@ func (e ServiceEndpoint) MarshalJSON() ([]byte, error) {
 	case len(e.URIRefs) == 0 && len(e.Maps) == 0:
 		return nil, errors.New("DID service endpoint empty")
 	case len(e.URIRefs) == 1 && len(e.Maps) == 0:
-		return json.Marshal(e.URIRefs[0])
+		return json.Marshal(e.URIRefs[0].String())
 	case len(e.URIRefs) == 0 && len(e.Maps) == 1:
 		return e.Maps[0], nil
 	}
+	// need JSON array for two or more entries
 
-	bytes, err := json.Marshal(e.URIRefs)
-	if err != nil {
-		return nil, err
+	sizeEst := 63 + len(e.URIRefs)*64
+	for _, raw := range e.Maps {
+		sizeEst += len(raw)
+	}
+	buf := make([]byte, 1, sizeEst)
+	buf[0] = '['
+
+	for _, u := range e.URIRefs {
+		if len(buf) > 1 {
+			buf = append(buf, ',')
+		}
+		buf = strconv.AppendQuote(buf, u.String())
 	}
 	for _, raw := range e.Maps {
-		bytes[len(bytes)-1] = ',' // flip array end
-		bytes = append(bytes, raw...)
-		bytes = append(bytes, ']') // new array end
+		if len(buf) > 1 {
+			buf = append(buf, ',')
+		}
+		buf = append(buf, raw...)
 	}
-	return bytes, err
+
+	return append(buf, ']'), nil
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
@@ -545,21 +557,24 @@ func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
 
 	switch bytes[0] {
 	case '"': // single string
-		if cap(e.URIRefs) != 0 {
-			e.URIRefs = e.URIRefs[:1]
-		} else {
-			e.URIRefs = make([]string, 1)
+		var s string
+		err := json.Unmarshal(bytes, &s)
+		if err != nil {
+			return err
 		}
-		return json.Unmarshal(bytes, &e.URIRefs[0])
+		u, err := url.Parse(s)
+		if err != nil {
+			return fmt.Errorf("malformed DID service enpoint URI: %w", err)
+		}
+
+		e.URIRefs = append(e.URIRefs, u)
+		return nil
 
 	case '{': // single map
-		if cap(e.Maps) != 0 {
-			e.Maps = e.Maps[:1]
-		} else {
-			e.Maps = make([]json.RawMessage, 1)
-		}
-		e.Maps[0] = make(json.RawMessage, len(bytes))
-		copy(e.Maps[0], bytes)
+		raw := make(json.RawMessage, len(bytes))
+		copy(raw, bytes)
+
+		e.Maps = append(e.Maps, raw)
 		return nil
 
 	case '[': // set composed of one or more strings and/or maps.
@@ -577,6 +592,7 @@ func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
 	if len(set) == 0 {
 		return errors.New("DID serviceEndpoint JSON array empty")
 	}
+
 	for _, raw := range set {
 		switch raw[0] {
 		case '"':
@@ -585,7 +601,12 @@ func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
 			if err != nil {
 				return err
 			}
-			e.URIRefs = append(e.URIRefs, s)
+			u, err := url.Parse(s)
+			if err != nil {
+				return fmt.Errorf("malformed DID service enpoint URI: %w", err)
+			}
+
+			e.URIRefs = append(e.URIRefs, u)
 		case '{':
 			e.Maps = append(e.Maps, raw)
 		default:

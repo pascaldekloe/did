@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/pascaldekloe/did"
@@ -306,10 +307,36 @@ func TestServiceUnmarshalJSON(t *testing.T) {
 		t.Errorf("got service type %q, want [%q]", got, wantType)
 	}
 	const wantEndpoint = "https://bar.example.com"
-	if got := doc.Services[0].Endpoint.URIRefs; len(got) != 1 || got[0] != wantEndpoint {
+	if got := doc.Services[0].Endpoint.URIRefs; len(got) != 1 || got[0].String() != wantEndpoint {
 		t.Errorf("got service endpoint strings %q, want [%q]", got, wantEndpoint)
 	}
 	if got := doc.Services[0].Endpoint.Maps; len(got) != 0 {
 		t.Errorf("got service endpoint maps %q, want none", got)
 	}
+}
+
+func TestServiceEndpointUnmarshalJSON(t *testing.T) {
+	t.Run("InvalidURIString", func(t *testing.T) {
+		const sample = `{"service": [{"id": "#ld0", "type": "LinkedDomains", "serviceEndpoint": ":"}]}`
+		err := json.Unmarshal([]byte(sample), new(did.Document))
+		if err == nil {
+			t.Fatal("no error")
+		}
+		const want = "malformed DID service enpoint URI"
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("got error %q, want Contains %q", err, want)
+		}
+	})
+
+	t.Run("InvalidURIArray", func(t *testing.T) {
+		const sample = `{"service": [{"id": "#ld0", "type": "LinkedDomains", "serviceEndpoint": ["http://127.0.0.1/", ":"]}]}`
+		err := json.Unmarshal([]byte(sample), new(did.Document))
+		if err == nil {
+			t.Fatal("no error")
+		}
+		const want = "malformed DID service enpoint URI"
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("got error %q, want Contains %q", err, want)
+		}
+	})
 }
