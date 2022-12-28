@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/pascaldekloe/did"
@@ -322,9 +321,9 @@ func TestServiceEndpointUnmarshalJSON(t *testing.T) {
 		if err == nil {
 			t.Fatal("no error")
 		}
-		const want = "malformed DID service enpoint URI"
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("got error %q, want Contains %q", err, want)
+		const want = "malformed DID service enpoint URI: missing protocol scheme"
+		if got := err.Error(); got != want {
+			t.Errorf("got error %q, want %q", got, want)
 		}
 	})
 
@@ -334,9 +333,9 @@ func TestServiceEndpointUnmarshalJSON(t *testing.T) {
 		if err == nil {
 			t.Fatal("no error")
 		}
-		const want = "malformed DID service enpoint URI"
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("got error %q, want Contains %q", err, want)
+		const want = "malformed DID service enpoint URI: missing protocol scheme"
+		if got := err.Error(); got != want {
+			t.Errorf("got error %q, want %q", got, want)
 		}
 	})
 }

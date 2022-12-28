@@ -459,7 +459,11 @@ func (srv *Service) UnmarshalJSON(bytes []byte) error {
 		}
 		p, err := url.Parse(s)
 		if err != nil {
-			return fmt.Errorf(`DID service JSON "id" content: %w`, err)
+			var wrap *url.Error // not usefull
+			if errors.As(err, &wrap) {
+				err = wrap.Err // trim
+			}
+			return fmt.Errorf(`malformed DID service "id" URI: %w`, err)
 		}
 		srv.ID = *p
 	}
@@ -564,6 +568,10 @@ func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
 		}
 		u, err := url.Parse(s)
 		if err != nil {
+			var wrap *url.Error // not usefull
+			if errors.As(err, &wrap) {
+				err = wrap.Err // trim
+			}
 			return fmt.Errorf("malformed DID service enpoint URI: %w", err)
 		}
 
@@ -603,6 +611,10 @@ func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
 			}
 			u, err := url.Parse(s)
 			if err != nil {
+				var wrap *url.Error // not usefull
+				if errors.As(err, &wrap) {
+					err = wrap.Err // trim
+				}
 				return fmt.Errorf("malformed DID service enpoint URI: %w", err)
 			}
 
