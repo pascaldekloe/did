@@ -14,6 +14,8 @@ import (
 
 const prefix = "did:" // URI scheme selection
 
+var errScheme = errors.New(`no "did:" scheme`)
+
 // DID contains the variable attributes.
 type DID struct {
 	// Method names the applicable scheme of the DID. The token value MUST
@@ -38,7 +40,7 @@ type SyntaxError struct {
 	// len(S) for an unexpected end of input, or -1 for location unknown.
 	I int
 
-	err error // optional cause
+	Err error // optional cause
 }
 
 // Error implements the standard error interface.
@@ -47,12 +49,10 @@ func (e *SyntaxError) Error() string {
 	switch {
 	case e.S == "":
 		return "empty DID string"
-	case e.err != nil:
-		desc = e.err.Error()
+	case e.Err != nil:
+		desc = e.Err.Error()
 	case e.I < 0:
 		desc = "reason unknown" // should not happen ™️
-	case e.I < len(prefix):
-		desc = `no "` + prefix + `" scheme`
 	case e.I >= len(e.S):
 		desc = "end incomplete"
 	default:
@@ -67,7 +67,7 @@ func (e *SyntaxError) Error() string {
 
 // Unwrap implements the errors.Unwrap convention.
 func (e *SyntaxError) Unwrap() error {
-	return e.err
+	return e.Err
 }
 
 // Parse validates s in full. It returns the mapping if, and only if s conforms
@@ -75,7 +75,7 @@ func (e *SyntaxError) Unwrap() error {
 func Parse(s string) (DID, error) {
 	for i := range prefix {
 		if i >= len(s) || s[i] != prefix[i] {
-			return DID{}, &SyntaxError{S: s, I: i}
+			return DID{}, &SyntaxError{S: s, I: i, Err: errScheme}
 		}
 	}
 	method, err := readMethodName(s)
@@ -370,7 +370,7 @@ func ParseURL(s string) (*URL, error) {
 			// — “URI: Generic Syntax” RFC 3986, subsection 4.2
 			switch c {
 			case ':':
-				return nil, &SyntaxError{S: s, I: i, err: errors.New("no \"did:\" scheme")}
+				return nil, &SyntaxError{S: s, I: i, Err: errScheme}
 			default:
 				continue
 
@@ -378,6 +378,7 @@ func ParseURL(s string) (*URL, error) {
 				// s is a relative URL
 				break
 			}
+			// s is a relative URL
 			break
 		}
 	}
@@ -418,7 +419,7 @@ func ParseURL(s string) (*URL, error) {
 				if errors.As(err, &wrap) {
 					err = wrap.Err // trim
 				}
-				return nil, &SyntaxError{S: s, I: -1, err: err}
+				return nil, &SyntaxError{S: s, I: -1, Err: err}
 			}
 
 			u.Fragment = p.Fragment
