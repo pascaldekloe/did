@@ -103,20 +103,21 @@ func (doc *Document) VerificationMethodRefs() (perURI map[*URL]*VerificationMeth
 				}
 			}
 
-			// resolve against DID document "id" when relative
-			base := &u.DID
-			if u.IsRelative() {
-				base = &doc.Subject
+			// resolve against DID document "id"
+			resolved := u
+			if resolved.IsRelative() {
+				r := *resolved // copy
+				r.DID = doc.Subject
+				resolved = &r
 			}
 
 			// evaluate each option
 			for _, m := range doc.VerificationMethods {
-				if m.ID.Fragment == u.Fragment && m.ID.DID == *base && pathEqual(m.ID.RawPath, u.RawPath) && queryEqual(m.ID.Query, u.Query) {
+				if m.ID.Equal(resolved) {
 					perURI[u] = m // found
 					continue MatchRefs
 				}
 			}
-
 			notFound = append(notFound, u)
 		}
 	}
