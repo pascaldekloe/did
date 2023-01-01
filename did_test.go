@@ -565,8 +565,8 @@ func FuzzURLString(f *testing.F) {
 		u := did.URL{DID: did.DID{Method: method, SpecID: specID}}
 
 		segs := []string{seg1, seg2}
-		if int(uint(segN)) < len(segs) {
-			segs = segs[:segN]
+		if int(segN&3) < len(segs) {
+			segs = segs[:segN&3]
 		}
 		u.SetPathSegments(segs...)
 
@@ -578,7 +578,7 @@ func FuzzURLString(f *testing.F) {
 		if err != nil {
 			t.Fatalf("ParseURL error on String result %q: %s", s, err)
 		}
-		if *u2 == u {
+		if *u2 != u {
 			t.Fatalf("%#v became %#v after codec cycle with %q", u, u2, s)
 		}
 	})
