@@ -20,8 +20,6 @@ import (
 
 const prefix = "did:" // URI scheme selection
 
-var errScheme = errors.New(`no "did:" scheme`)
-
 // DID contains both variable attributes of a Decentralized IDentifier.
 type DID struct {
 	// Method identifies the DID scheme in use. The name MUST consist of one
@@ -43,8 +41,6 @@ type SyntaxError struct {
 	// I has the index of the first illegal character [byte] in S, with
 	// len(S) for an unexpected end of input, or -1 for location unknown.
 	I int
-
-	Err error // optional cause
 }
 
 // Error implements the standard error interface.
@@ -53,12 +49,12 @@ func (e *SyntaxError) Error() string {
 	switch {
 	case e.S == "":
 		return "empty DID string"
-	case e.Err != nil:
-		desc = e.Err.Error()
 	case e.I < 0:
 		desc = "reason unknown" // should not happen ™️
 	case e.I >= len(e.S):
 		desc = "end incomplete"
+	case e.S[e.I] == ':' && strings.IndexAny(e.S, ":/?#") >= e.I:
+		desc = `no "did:" scheme`
 	default:
 		desc = fmt.Sprintf("illegal %q at byte № %d", e.S[e.I], e.I+1)
 	}
@@ -69,19 +65,21 @@ func (e *SyntaxError) Error() string {
 	return fmt.Sprintf("invalid DID %q [truncated]: %s", e.S[:199]+"…", desc)
 }
 
-// Unwrap implements the errors.Unwrap convention.
-func (e *SyntaxError) Unwrap() error {
-	return e.Err
-}
-
 // Parse validates s in full. It returns the mapping if, and only if s conforms
 // to the DID syntax specification. Errors will be of type *SyntaxError.
 func Parse(s string) (DID, error) {
-	for i := range prefix {
-		if i >= len(s) || s[i] != prefix[i] {
-			return DID{}, &SyntaxError{S: s, I: i, Err: errScheme}
+	if len(s) < len(prefix) || s[:len(prefix)] != prefix {
+		i := strings.IndexAny(s, ":/?#")
+		if i >= 0 && s[i] == ':' {
+			return DID{}, &SyntaxError{S: s, I: i}
+		}
+		for i := range prefix {
+			if i >= len(s) || prefix[i] != s[i] {
+				return DID{}, &SyntaxError{S: s, I: i}
+			}
 		}
 	}
+
 	method, err := readMethodName(s)
 	if err != nil {
 		return DID{}, err
@@ -406,7 +404,7 @@ func ParseURL(s string) (*URL, error) {
 				continue
 			case ':':
 				// got scheme in s[:i], and it is not "did"
-				return nil, &SyntaxError{S: s, I: i, Err: errScheme}
+				return nil, &SyntaxError{S: s, I: i}
 
 			case '/', '?', '#':
 				break
