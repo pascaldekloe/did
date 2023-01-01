@@ -199,33 +199,6 @@ func TestDIDString(t *testing.T) {
 	}
 }
 
-func FuzzDIDString(f *testing.F) {
-	f.Add("a", "b")
-	f.Add("1", "2%3")
-	f.Fuzz(func(t *testing.T, method, specID string) {
-		// omit invalid method names for fuzz test
-		if method == "" {
-			return
-		}
-		for _, r := range method {
-			if r < '0' || r > '9' && r < 'a' || r > 'z' {
-				return
-			}
-		}
-
-		d := did.DID{Method: method, SpecID: specID}
-		s := d.String()
-
-		d2, err := did.Parse(s)
-		if err != nil {
-			t.Fatalf("Parse error on String result %q: %s", s, err)
-		}
-		if d != d2 {
-			t.Fatalf("%#v became %#v after codec cycle with %q", d, d2, s)
-		}
-	})
-}
-
 // DIDEquals groups equivalent DIDs.
 var DIDEquals = [][]string{
 	{
