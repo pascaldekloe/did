@@ -389,6 +389,7 @@ func ParseURL(s string) (*URL, error) {
 		}
 		d, err := Parse(s[:i])
 		if err != nil {
+			err.(*SyntaxError).S = s
 			return nil, err
 		}
 		u.DID = d
