@@ -867,41 +867,16 @@ func (u *URL) PathSegments() []string {
 		if i < 0 {
 			break
 		}
-		segs = append(segs, unescape(s[:i]))
+		segs = append(segs, bestEffortDecode(s[:i]))
 		s = s[i+1:]
 	}
 
 	// apply the last segment
 	if s != "" {
-		segs = append(segs, unescape(s))
+		segs = append(segs, bestEffortDecode(s))
 	}
 
 	return segs
-}
-
-// Percent-encodings get resolved on best-effort basis. Malformed encodings
-// simply pass as is.
-func unescape(s string) string {
-	i := strings.IndexByte(s, '%')
-	if i < 0 {
-		return s // fast path
-	}
-
-	var b strings.Builder
-	for ; i >= 0; i = strings.IndexByte(s, '%') {
-		v, err := parseHex(s, i+1)
-		if err != nil {
-			b.WriteString(s[:i+1]) // all including the '%'
-			s = s[i+1:]            // pass '%'
-			continue
-		}
-
-		b.WriteString(s[:i]) // all before the '%'
-		b.WriteByte(v)       // escaped value
-		s = s[i+3:]          // pass '%' and both hex digits
-	}
-	b.WriteString(s)
-	return b.String()
 }
 
 // SetPathSegments updates the path in a foolproof manner. Unsafe characters are
@@ -936,7 +911,7 @@ func (u *URL) Query() string {
 	if u.RawFragment == "" || u.RawFragment[0] != '#' {
 		return ""
 	}
-	return unescape(u.RawFragment[1:])
+	return bestEffortDecode(u.RawFragment[1:])
 }
 
 // SetQuery sets RawQuery to contain a normalized encoding of s.
@@ -956,7 +931,7 @@ func (u *URL) Fragment() string {
 	if u.RawFragment == "" || u.RawFragment[0] != '#' {
 		return ""
 	}
-	return unescape(u.RawFragment[1:])
+	return bestEffortDecode(u.RawFragment[1:])
 }
 
 // SetFragment sets RawFragment to contain a normalized encoding of s.
@@ -1040,6 +1015,30 @@ func SetVersionParams(params url.Values, s string, t time.Time) {
 	} else {
 		params.Del("versionTime")
 	}
+}
+
+// Malmormed percent-encodings simply pass as is.
+func bestEffortDecode(s string) string {
+	i := strings.IndexByte(s, '%')
+	if i < 0 {
+		return s // fast path
+	}
+
+	var b strings.Builder
+	for ; i >= 0; i = strings.IndexByte(s, '%') {
+		v, err := parseHex(s, i+1)
+		if err != nil {
+			b.WriteString(s[:i+1]) // all including the '%'
+			s = s[i+1:]            // pass '%'
+			continue
+		}
+
+		b.WriteString(s[:i]) // all before the '%'
+		b.WriteByte(v)       // escaped value
+		s = s[i+3:]          // pass '%' and both hex digits
+	}
+	b.WriteString(s)
+	return b.String()
 }
 
 // EncodeWithLead returns s prefixed by lead, including percent-encoding where
