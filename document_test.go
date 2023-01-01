@@ -250,8 +250,8 @@ func TestVerificationMethodMarshalJSON(t *testing.T) {
 	doc.VerificationMethods = []*did.VerificationMethod{
 		{
 			ID: did.URL{
-				DID:      did.DID{Method: "example", SpecID: "123"},
-				Fragment: "_Qq0UL2Fq651Q0Fjd6TvnYE-faHiOpRlPVQcY_-tA4A",
+				DID:         did.DID{Method: "example", SpecID: "123"},
+				RawFragment: "#_Qq0UL2Fq651Q0Fjd6TvnYE-faHiOpRlPVQcY_-tA4A",
 			},
 			Type:       "JsonWebKey2020",
 			Controller: did.DID{Method: "example", SpecID: "123"},
@@ -265,8 +265,8 @@ func TestVerificationMethodMarshalJSON(t *testing.T) {
 			},
 		}, {
 			ID: did.URL{
-				DID:      did.DID{Method: "example", SpecID: "123456789abcdefghi"},
-				Fragment: "keys-1",
+				DID:         did.DID{Method: "example", SpecID: "123456789abcdefghi"},
+				RawFragment: "#keys-1",
 			},
 			Type:       "Ed25519VerificationKey2020",
 			Controller: did.DID{Method: "example", SpecID: "pqrstuvwxyz0987654321"},

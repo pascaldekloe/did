@@ -1,5 +1,11 @@
 // Package did implements W3C's Decentralized Identifier (DID) standard.
 // See https://www.w3.org/TR/did-core/ for the specification.
+//
+// BUG(pascaldekloe): Version 1.0 of the DID standard states that the DID URL
+// syntax “supports a simple format for parameters”, which is not to say that
+// the query part always is a parameter encoding. The actual format of such
+// “simple format” remains unspecified. As a result, equivalence testing of the
+// query part has no formal way to determine whether "?a%3Db" equals "?a=b".
 package did
 
 import (
@@ -16,18 +22,16 @@ const prefix = "did:" // URI scheme selection
 
 var errScheme = errors.New(`no "did:" scheme`)
 
-// DID contains the variable attributes.
+// DID contains both variable attributes of a Decentralized IDentifier.
 type DID struct {
-	// Method names the applicable scheme of the DID. The token value MUST
-	// consist of lower-case letters 'a'–'z' and/or decimals '0'–'9' only.
-	//
-	// Use constants when setting this property to prevent malformed DID
-	// production (with String). Instances returned by the parse methods
-	// always contain a valid method.
+	// Method identifies the DID scheme in use. The name MUST consist of one
+	// or more letters 'a'–'z' and/or digits '0'–'9' exclusively. Any return
+	// from the Parse functions in this package is guaranteed to be valid.
 	Method string
 
-	// Method-specific identifiers may or may not contain a valid UTF-8
-	// sequence. The W3C standard puts no constaints on the (byte) content.
+	// The method-specific identifier must contain one or more characters.
+	// None of the applicable standards put any constaints on the byte-
+	// content. The field may or may not be a valid UTF-8 string.
 	SpecID string
 }
 
@@ -92,10 +96,11 @@ func Parse(s string) (DID, error) {
 func readMethodName(s string) (string, error) {
 	for i := len(prefix); i < len(s); i++ {
 		switch s[i] {
-		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z':
-			continue // valid
+		// match method-char BNF
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // DIGIT
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // %x61-7A
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z': // %x61-7A
+			continue // pass
 
 		case ':':
 			// one or more characters required
@@ -131,15 +136,16 @@ NoEscapes:
 		}
 
 		switch s[i] {
-		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-			'.', '-', '_',
-			':':
+		// match method-specific-id BNF
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // DIGIT
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // ALPHA
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', // ALPHA
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // ALPHA
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', // ALPHA
+			'.', '-', '_', // idchar
+			':': // method-specific-id
 			// colon not allowed as last character check delayed
-			i++
+			i++ // pass
 
 		case '%':
 			break NoEscapes
@@ -157,6 +163,7 @@ NoEscapes:
 
 	for i < len(s) {
 		switch s[i] {
+		// match method-specific-id BNF
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
 			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
@@ -190,9 +197,31 @@ NoEscapes:
 	return specID[:len(specID)-1], len(s) - 1
 }
 
-// EqualString returns whether s conforms to the DID syntax, and whether it is
-// equivalent to d according to the “Normalization and Comparison” rules of RFC
-// 3986, section 6.
+// Equal returns whether both d and o are valid, and whether they are equivalent
+// according to the “Normalization and Comparison” rules of RFC 3986, section 6.
+func (d DID) Equal(o DID) bool {
+	if d.Method == "" || d.SpecID == "" {
+		return false // invalid
+	}
+
+	// validate method name
+	for i := 0; i < len(d.Method); i++ {
+		switch d.Method[i] {
+		// match method-char BNF
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // DIGIT
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // %x61-7A
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z': // %x61-7A
+			continue // pass
+		default:
+			return false // invalid
+		}
+	}
+
+	return o == d
+}
+
+// EqualString returns whether whether s conforms to the DID syntax, and whether
+// the reference is equivalent according to DID Equal.
 func (d DID) EqualString(s string) bool {
 	// scheme compare
 	if len(s) < len(prefix) || s[:len(prefix)] != prefix {
@@ -206,6 +235,9 @@ func (d DID) EqualString(s string) bool {
 	}
 
 	// method-specific identifier compare
+	if d.SpecID == "" {
+		return false // invalid
+	}
 	i := len(prefix) + len(method) + 1
 	for j := 0; j < len(d.SpecID); j++ {
 		c := d.SpecID[j]
@@ -213,7 +245,6 @@ func (d DID) EqualString(s string) bool {
 		if i >= len(s) {
 			return false
 		}
-
 		switch s[i] {
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
@@ -245,9 +276,10 @@ func (d DID) EqualString(s string) bool {
 	return i >= len(s) // compared all
 }
 
-// String returns the DID syntax, with the empty string for the zero value. Any
-// and all colon characters (':') in the method-specific identifier are escaped
-// (with "%3A").
+// String returns either the URL, or the empty string when zero. Any and all
+// colon characters (':') in the method-specific identifier are escaped (with
+// "%3A"). The return is invalid if any of the attributes (Method or SpecID) are
+// invalid.
 func (d DID) String() string {
 	if d.Method == "" && d.SpecID == "" {
 		return ""
@@ -320,12 +352,26 @@ func (d *DID) UnmarshalJSON(bytes []byte) error {
 
 // URL extends the syntax of a basic DID to incorporate other standard URI
 // components such as path, query, and fragment in order to locate a particular
-// resource.
+// resource—for example, a cryptographic public key inside a DID document, or a
+// resource external to the DID document.
 type URL struct {
-	DID
-	RawPath  string     // optional
-	Query    url.Values // optional
-	Fragment string     // optional
+	DID // may be zero when the URL IsRelative.
+
+	// The path is an optional URI component. Its raw (as in unmodified)
+	// string may contain any number of percent-encoded octets. A relative
+	// DID URL [IsRelative] may have a rootless path—not starting with a
+	// slash ('/') character.
+	RawPath string
+
+	// The query is an optional URI component. Its raw (as in unmodified)
+	// string may contain any number of percent-encoded octets. The first
+	// first character should be a question mark ('?') if present.
+	RawQuery string
+
+	// The fragment is an optional URI component. Its raw (as in unmodified)
+	// string may contain any number of percent-encoded octets. The first
+	// first character should be a number sign ('#') if present.
+	RawFragment string
 }
 
 // ParseURL validates s in full. It returns the mapping if, and only if s
@@ -338,55 +384,60 @@ func ParseURL(s string) (*URL, error) {
 	var u URL // result
 	var i int // s index
 
+	// scheme match
 	if len(s) >= len(prefix) && s[:len(prefix)] == prefix {
-		// has "did:" scheme
 		method, err := readMethodName(s)
 		if err != nil {
 			return nil, err
 		}
-		u.Method = method
-
-		u.SpecID, i = parseSpecID(s, len(prefix)+len(method)+1)
-		if u.SpecID == "" {
-			return nil, &SyntaxError{S: s, I: i}
+		specID, end := parseSpecID(s, len(prefix)+len(method)+1)
+		if specID == "" {
+			return nil, &SyntaxError{S: s, I: end}
 		}
-		if i >= len(s) {
-			// no query and/or fragment
+		u.DID = DID{Method: method, SpecID: specID}
+
+		if end >= len(s) {
 			return &u, nil
 		}
-		switch s[i] {
+		switch s[end] {
 		case '/', '?', '#':
-			break // URL additions
+			i = end
 		default:
-			return nil, &SyntaxError{S: s, I: i}
+			return nil, &SyntaxError{S: s, I: end}
 		}
 	} else {
-		// could be either another scheme or a relative URL
-		for i, c := range s {
-			// “A path segment that contains a colon character
-			// (e.g., "this:that") cannot be used as the first
-			// segment of a relative-path reference, as it would
-			// be mistaken for a scheme name.”
-			// — “URI: Generic Syntax” RFC 3986, subsection 4.2
-			switch c {
-			case ':':
-				return nil, &SyntaxError{S: s, I: i, Err: errScheme}
+		// Relative references need an additional check. “A path segment
+		// that contains a colon character (e.g., "this:that") cannot be
+		// used as the first segment of a relative-path reference, as it
+		// would be mistaken for a scheme name.” — “URI: Generic Syntax”
+		// RFC 3986, subsection 4.2
+		for i := 0; i < len(s); i++ {
+			switch s[i] {
 			default:
 				continue
+			case ':':
+				// got scheme in s[:i], and it is not "did"
+				return nil, &SyntaxError{S: s, I: i, Err: errScheme}
 
 			case '/', '?', '#':
-				// s is a relative URL
 				break
 			}
-			// s is a relative URL
 			break
 		}
 	}
+	offset := i
 
-	// Parse “Path” from “URI: Generic Syntax” RFC 3986, subsection 3.3.
-	pathOffset := i
-	for ; i < len(s); i++ {
+	// Read “Path” from “URI: Generic Syntax” RFC 3986, subsection 3.3.
+	for {
+		if i >= len(s) {
+			u.RawPath = s[offset:]
+			return &u, nil
+		}
+
 		switch s[i] {
+		default:
+			return nil, &SyntaxError{S: s, I: i}
+
 		// match path BNF excluding pct-encoded
 		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // unreserved
 			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // unreserved
@@ -397,6 +448,7 @@ func ParseURL(s string) (*URL, error) {
 			'!', '$', '&', '\'', '(', ')', '*', '+', ',', ';', '=', // sub-delims
 			':', '@', // pchar additions
 			'/':
+			i++
 			continue
 
 		// match pct-encoded BNF
@@ -405,38 +457,95 @@ func ParseURL(s string) (*URL, error) {
 			if err != nil {
 				return nil, err
 			}
-			i += 2
+			i += 3
+			continue
 
-		// “The path is terminated by the first question mark ("?") or
-		// number sign ("#") character, or by the end of the URI.”
-		case '#', '?':
-			u.RawPath = s[pathOffset:i]
+		case '?', '#':
+			u.RawPath = s[offset:i]
+			break
+		}
+		break
+	}
+	offset = i
+	i++
 
-			// https://github.com/pascaldekloe/did/issues/2
-			p, err := url.Parse(s[i:])
-			if err != nil {
-				var wrap *url.Error // not usefull
-				if errors.As(err, &wrap) {
-					err = wrap.Err // trim
+	if s[offset] == '?' {
+		// Read “Query” from “URI: Generic Syntax” RFC 3986, subsection 3.4.
+		for {
+			if i >= len(s) {
+				u.RawQuery = s[offset:]
+				return &u, nil
+			}
+
+			switch s[i] {
+			default:
+				return nil, &SyntaxError{S: s, I: i}
+
+			// match path BNF excluding pct-encoded
+			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // unreserved
+				'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // unreserved
+				'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', // unreserved
+				'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // unreserved
+				'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', // unreserved
+				'-', '.', '_', '~', // unreserved
+				'!', '$', '&', '\'', '(', ')', '*', '+', ',', ';', '=', // sub-delims
+				':', '@', // pchar
+				'/', '?': // query
+				i++ // valid
+				continue
+
+			// match pct-encoded BNF
+			case '%':
+				_, err := parseHex(s, i+1)
+				if err != nil {
+					return nil, err
 				}
-				return nil, &SyntaxError{S: s, I: -1, Err: err}
-			}
+				i += 3
+				continue
 
-			u.Fragment = p.Fragment
-			if p.RawQuery != "" {
-				u.Query = p.Query()
+			case '#':
+				u.RawQuery = s[offset:i]
+				offset = i
+				break
 			}
-			return &u, nil
+			break
+		}
+		offset = i
+		i++
+	}
 
+	// Read “Fragment” from “URI: Generic Syntax” RFC 3986, subsection 3.5.
+	for i < len(s) {
+		switch s[i] {
 		default:
 			return nil, &SyntaxError{S: s, I: i}
+
+		// match path BNF excluding pct-encoded
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // unreserved
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // unreserved
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', // unreserved
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // unreserved
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', // unreserved
+			'-', '.', '_', '~', // unreserved
+			'!', '$', '&', '\'', '(', ')', '*', '+', ',', ';', '=', // sub-delims
+			':', '@', // pchar
+			'/', '?': // fragment
+			i++
+
+		// match pct-encoded BNF
+		case '%':
+			_, err := parseHex(s, i+1)
+			if err != nil {
+				return nil, err
+			}
+			i += 3
 		}
 	}
-	u.RawPath = s[pathOffset:]
+	u.RawFragment = s[offset:]
 	return &u, nil
 }
 
-// IsRelative returns whether u has a .DID component.
+// IsRelative returns whether u is a relative URI reference.
 //
 // “A relative DID URL is any URL value in a DID document that does not start
 // with did:<method-name>:<method-specific-id>. More specifically, it is any URL
@@ -444,64 +553,130 @@ func ParseURL(s string) (*URL, error) {
 // expected to reference a resource in the same DID document.”
 func (u *URL) IsRelative() bool { return u.Method == "" && u.SpecID == "" }
 
-// Equal returns whether v is equivalent to u according to the “Normalization
-// and Comparison” rules of RFC 3986, section 6. Path evaluation follows the
-// logic of path.Clean. Duplicate query-parameters are compared in order of
-// their appearance, i.e., "?foo=1&foo=2" is not equivalent to "?foo=2&foo=1".
+// Equal returns whether both u and o are valid, and whether they are equivalent
+// according to the “Normalization and Comparison” rules of RFC 3986, section 6.
+// Path evaluation follows the logic of path.Clean. Query eqvaluetion compares
+// the escaped content byte-for-byte. See the bugs section for details.
 //
-// Relative URLs never compare equal. RFC 3986, subection 6.1, states “In
-// testing for equivalence, applications should not directly compare relative
-// references; the references should be converted to their respective target
-// URIs before comparison.”.
-func (u *URL) Equal(v *URL) bool {
-	return v.Fragment == u.Fragment &&
-		!v.IsRelative() && v.DID == u.DID &&
-		pathEqual(v.RawPath, u.RawPath) &&
-		queryEqual(v.Query, u.Query)
+// Relative URLs do not compare equal as a safety precaution. “In testing for
+// equivalence, applications should not directly compare relative references;
+// the references should be converted to their respective target URIs before
+// comparison.” as per “URI Generic Syntax” RFC 3986, subsection 6.1.
+func (u *URL) Equal(o *URL) bool {
+	// “Normalization should not remove delimiters when their associated
+	// component is empty unless licensed to do so by the scheme
+	// specification.”
+	// — “URI: Generic Syntax” RFC 3986, subsection 6.2.3
+	return !o.IsRelative() && o.DID.Equal(u.DID) &&
+		escapedWithLeadEqual(o.RawFragment, u.RawFragment, '#') &&
+		escapedWithLeadEqual(o.RawQuery, u.RawQuery, '?') &&
+		pathEqual(o.RawPath, u.RawPath)
 }
 
-// EqualString returns whether s conforms to the DID URL syntax, and whether it
-// is equivalent to u according to the “Normalization and Comparison” rules of
-// RFC 3986, section 6. Path evaluation follows the logic of path.Clean.
-// Duplicate query-parameters are compared in order of their appearance, i.e.,
-// "?foo=1&foo=2" is not equivalent to "?foo=2&foo=1".
-//
-// Relative URLs never compare equal. RFC 3986, subection 6.1, states “In
-// testing for equivalence, applications should not directly compare relative
-// references; the references should be converted to their respective target
-// URIs before comparison.”.
+// EqualString returns whether whether s conforms to the DID URL syntax, and
+// whether the reference is equivalent according to URL Equal.
 func (u *URL) EqualString(s string) bool {
-	for i := 0; i < len(s); i++ {
-		switch s[i] {
-		case '/', '?', '#':
-			if !u.DID.EqualString(s[:i]) {
-				return false
-			}
+	o, err := ParseURL(s)
+	return err == nil && u.Equal(o)
+}
 
-			p, err := url.Parse(s[i:])
+// EscapedWithLeadEqual returns whether a and b both have lead as the first
+// character, if non-zero, and whether their remainders represent the same
+// octet-sequence. Invalid encodings never compare equal.
+func escapedWithLeadEqual(a, b string, lead byte) bool {
+	switch {
+	case a == b:
+		return true // fast path
+	case a == "", b == "":
+		return false // one empty–other not
+	case a[0] != lead, b[0] != lead:
+		return false // invalid prefix (in raw field)
+	}
+	a = a[1:]
+	b = b[1:]
+
+	for {
+		switch {
+		case a == "":
+			return b == ""
+		case b == "":
+			return false
+		}
+
+		var ac byte
+		switch a[0] {
+		// match query or fragment BNF excluding pct-encoded
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // unreserved
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // unreserved
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', // unreserved
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // unreserved
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', // unreserved
+			'-', '.', '_', '~', // unreserved
+			'!', '$', '&', '\'', '(', ')', '*', '+', ',', ';', '=', // sub-delims
+			':', '@', // pchar
+			'/', '?': // query or fragment
+			ac = a[0]
+			a = a[1:] // pass
+
+		// match pct-encoded
+		case '%':
+			var err error
+			ac, err = parseHex(a, 1)
 			if err != nil {
-				return false
+				return false // invalid
 			}
-			path := p.RawPath
-			if path == "" {
-				path = p.Path
+			a = a[3:] // pass
+
+		default:
+			return false // invalid
+		}
+
+		var bc byte
+		switch b[0] {
+		// match query or fragment BNF excluding pct-encoded
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // unreserved
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // unreserved
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', // unreserved
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // unreserved
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', // unreserved
+			'-', '.', '_', '~', // unreserved
+			'!', '$', '&', '\'', '(', ')', '*', '+', ',', ';', '=', // sub-delims
+			':', '@', // pchar
+			'/', '?': // query or fragment
+			bc = b[0]
+			b = b[1:] // pass
+
+		// match pct-encoded
+		case '%':
+			var err error
+			bc, err = parseHex(b, 1)
+			if err != nil {
+				return false // invalid
 			}
-			return u.Fragment == p.Fragment && pathEqual(u.RawPath, path) && queryEqualURLQuery(u.Query, p)
+			b = b[3:] // pass
+
+		default:
+			return false // invalid
+		}
+
+		if ac != bc {
+			return false // payload mismatch
 		}
 	}
 
-	return u.RawPath == "" && len(u.Query) == 0 && u.Fragment == "" && u.DID.EqualString(s)
+	return true // all compared equal
 }
 
+// PathEqual returns whether a and b represent the same path when normalized.
+// Invalid encodings never compare equal.
 func pathEqual(a, b string) bool {
-	if a == b {
-		return true
+	switch {
+	case a == b:
+		return true // fast path
+	case a == "", b == "":
+		return false // one empty–other not
 	}
-	if a == "" || b == "" {
-		return false
-	}
-
-	// normalize without root
+	// normalize without root (could be optimized with more code)
 	a = path.Join("/", a)[1:]
 	b = path.Join("/", b)[1:]
 
@@ -513,100 +688,80 @@ func pathEqual(a, b string) bool {
 			return false
 		}
 
-		ac := a[0]
-		if ac != '%' {
-			a = a[1:]
-		} else {
+		var ac byte
+		var aEscSep bool
+		switch a[0] {
+		// match path BNF excluding pct-encoded
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // unreserved
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // unreserved
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', // unreserved
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // unreserved
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', // unreserved
+			'-', '.', '_', '~', // unreserved
+			'!', '$', '&', '\'', '(', ')', '*', '+', ',', ';', '=', // sub-delims
+			':', '@', // pchar
+			'/': // path
+			ac = a[0]
+			a = a[1:] // pass
+
+		// match pct-encoded
+		case '%':
 			var err error
 			ac, err = parseHex(a, 1)
 			if err != nil {
-				return false
+				return false // invalid
 			}
-			a = a[3:]
+			a = a[3:] // pass
+			aEscSep = ac == '/'
+
+		default:
+			return false // invalid
 		}
 
-		bc := b[0]
-		if bc != '%' {
-			b = b[1:]
-		} else {
+		var bc byte
+		var bEscSep bool
+		switch b[0] {
+		// match path BNF excluding pct-encoded
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // unreserved
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // unreserved
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', // unreserved
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // unreserved
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', // unreserved
+			'-', '.', '_', '~', // unreserved
+			'!', '$', '&', '\'', '(', ')', '*', '+', ',', ';', '=', // sub-delims
+			':', '@', // pchar
+			'/': // path
+			bc = b[0]
+			b = b[1:] // pass
+
+		// match pct-encoded
+		case '%':
 			var err error
 			bc, err = parseHex(b, 1)
 			if err != nil {
-				return false
+				return false // invalid
 			}
-			b = b[3:]
+			b = b[3:] // pass
+			bEscSep = bc == '/'
+
+		default:
+			return false // invalid
 		}
 
-		if ac != bc {
-			return false
+		if ac != bc || aEscSep != bEscSep {
+			return false // path mismatch
 		}
 	}
+
+	return true // all compared equal
 }
 
-func queryEqualURLQuery(q url.Values, u *url.URL) bool {
-	switch {
-	case u.RawQuery == "":
-		return len(q) == 0
-	case len(q) == 0:
-		return false
-	default:
-		return queryEqual(q, u.Query())
-	}
-}
-
-func queryEqual(a, b url.Values) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for name, values := range a {
-		match := b[name]
-
-		if len(values) != len(match) {
-			return false
-		}
-		for i := range values {
-			if values[i] != match[i] {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// GoURL returns a mapping to the Go model. Note that DID URLs go into .Opaque.
-// In contrast, the IsRelative URLs use .Path instead, and without the .Scheme.
-func (u *URL) GoURL() *url.URL {
-	g := url.URL{Fragment: u.Fragment}
-
-	if s := u.DID.String(); s == "" {
-		g.RawPath = u.RawPath
-		g.Path, _ = url.PathUnescape(u.RawPath)
-	} else {
-		g.Scheme = prefix[:len(prefix)-1]
-		g.Opaque = s[len(prefix):]
-		if u.RawPath != "" {
-			if u.RawPath[0] != '/' {
-				g.Opaque += "/"
-			}
-			g.Opaque += u.RawPath
-		}
-	}
-
-	if len(u.Query) != 0 {
-		g.RawQuery = u.Query.Encode()
-	}
-	return &g
-}
-
-// String returns the DID URL, with the empty string for the zero value. Any and
+// String returns either the DID URL, or the empty string when zero. Any and
 // all colon characters (':') in the method-specific identifier are escaped
-// (with "%3A").
+// (with "%3A"). The return is invalid if any of the attributes (DID, RawPath,
+// RawQuery or RawFragment) are invalid.
 func (u *URL) String() string {
-	if u.RawPath == "" && len(u.Query) == 0 && u.Fragment == "" {
-		return u.DID.String()
-	}
-	return u.GoURL().String()
+	return u.DID.String() + u.RawPath + u.RawQuery + u.RawFragment
 }
 
 // PathWithEscape returns the RawPath with any and all of its percent-encodings
@@ -616,6 +771,9 @@ func (u *URL) String() string {
 // by the path-separator character ('/'). Escape-character occurrences are
 // replaced by two sequential escape characters. Percent-encodings that resolve
 // to the escape character get replaced by two sequential escape characters.
+//
+// None of the applicable standards put any constraints on the byte-content. The
+// return may or may not be a valid UTF-8 string.
 func (u *URL) PathWithEscape(escape byte) string {
 	s := u.RawPath
 	i := 0
@@ -703,6 +861,9 @@ func (u *URL) PathWithEscape(escape byte) string {
 // Percent-encodings get resolved on best-effort basis. Malformed encodings
 // simply pass as is. The return is guaranteed to be equal to any and all
 // arguments passed to SetPathSegments.
+//
+// None of the applicable standards put any constraints on the byte-content. The
+// return may or may not consist of valid UTF-8 strings.
 func (u *URL) PathSegments() []string {
 	if u.RawPath == "" {
 		return nil
@@ -717,21 +878,21 @@ func (u *URL) PathSegments() []string {
 		if i < 0 {
 			break
 		}
-		segs = append(segs, pathUnescape(s[:i]))
+		segs = append(segs, unescape(s[:i]))
 		s = s[i+1:]
 	}
 
 	// apply the last segment
 	if s != "" {
-		segs = append(segs, pathUnescape(s))
+		segs = append(segs, unescape(s))
 	}
 
 	return segs
 }
 
-// PathUnescape resolves percent-encoding on best-effort basis.
-// Malformend encodings are passed as is.
-func pathUnescape(s string) string {
+// Percent-encodings get resolved on best-effort basis. Malformed encodings
+// simply pass as is.
+func unescape(s string) string {
 	i := strings.IndexByte(s, '%')
 	if i < 0 {
 		return s // fast path
@@ -757,6 +918,9 @@ func pathUnescape(s string) string {
 // SetPathSegments updates the path in a foolproof manner. Unsafe characters are
 // replaced by their percent-encodings. The return of PathSegments is guaranteed
 // to be equal to any and all arguments passed to SetPathSegments.
+//
+// None of the applicable standards put any constraints on the byte-content.
+// Segs may or may not consist of valid UTF-8 strings.
 func (u *URL) SetPathSegments(segs ...string) {
 	if len(segs) == 0 {
 		u.RawPath = ""
@@ -774,54 +938,44 @@ func (u *URL) SetPathSegments(segs ...string) {
 	u.RawPath = b.String()
 }
 
-var (
-	errVersionIDDupe   = errors.New("duplicate versionId in DID URL")
-	errVersionTimeDupe = errors.New("duplicate versionTime in DID URL")
-)
-
-// VersionParams returns the standardised "versionId" and "versionTime".
-func (u *URL) VersionParams() (string, time.Time, error) {
-	var s string
-	switch a := u.Query["versionId"]; len(a) {
-	case 0:
-		break
-	case 1:
-		s = a[0]
-	default:
-		return "", time.Time{}, errVersionIDDupe
+// Fragment returns the encoded value from RawQuery, if any. Decoding is on
+// best-effort basis. Malformed percent-encodings simply pass as is.
+//
+// None of the applicable standards put any constraints on the byte-content. The
+// return may or may not be a valid UTF-8 string.
+func (u *URL) Query() string {
+	if u.RawFragment == "" || u.RawFragment[0] != '#' {
+		return ""
 	}
-
-	switch a := u.Query["versionTime"]; len(a) {
-	case 0:
-		return s, time.Time{}, nil
-	case 1:
-		t, err := time.Parse(time.RFC3339, a[0])
-		if err != nil {
-			return "", time.Time{}, fmt.Errorf("versionTime in DID URL: %w", err)
-		}
-		return s, t, nil
-	default:
-		return "", time.Time{}, errVersionTimeDupe
-	}
+	return unescape(u.RawFragment[1:])
 }
 
-// SetVersionParams installs the standardised "versionId" and "versionTime". The
-// zero value on either s or t omits the respective parameter.
-func (u *URL) SetVersionParams(s string, t time.Time) {
-	if s == "" {
-		u.Query["versionId"] = append(u.Query["versionId"][:0], s)
-	}
+// SetQuery sets RawQuery to contain a normalized encoding of s.
+//
+// None of the applicable standards put any constaints on the byte-content. S
+// may or may not be a valid UTF-8 string.
+func (u *URL) SetQuery(s string) {
+	u.RawQuery = encodeWithLead(s, '?')
+}
 
-	if !t.IsZero() {
-		// JSON production requires “normalized to UTC 00:00:00 and
-		// without sub-second decimal precision”, as per subsection
-		// 6.2.1 of the v1 specification.
-		t := t.UTC()
-		if t.Nanosecond() != 0 {
-			t = t.Round(time.Second)
-		}
-		u.Query["versionTime"] = append(u.Query["versionTime"][:0], t.Format(time.RFC3339))
+// Fragment returns the encoded value from RawFragment, if any. Decoding is on
+// best-effort basis. Malformed percent-encodings simply pass as is.
+//
+// None of the applicable standards put any constraints on the byte-content. The
+// return may or may not be a valid UTF-8 string.
+func (u *URL) Fragment() string {
+	if u.RawFragment == "" || u.RawFragment[0] != '#' {
+		return ""
 	}
+	return unescape(u.RawFragment[1:])
+}
+
+// SetFragment sets RawFragment to contain a normalized encoding of s.
+//
+// None of the applicable standards put any constaints on the byte-content. S
+// may or may not be a valid UTF-8 string.
+func (u *URL) SetFragment(s string) {
+	u.RawFragment = encodeWithLead(s, '#')
 }
 
 // MarshalJSON implements the json.Marshaler interface.
@@ -843,6 +997,92 @@ func (u *URL) UnmarshalJSON(bytes []byte) error {
 	}
 	*u = *p // copy
 	return nil
+}
+
+var (
+	errVersionIDDupe   = errors.New("duplicate versionId in DID URL")
+	errVersionTimeDupe = errors.New("duplicate versionTime in DID URL")
+)
+
+// VersionParams returns the standardised "versionId" and "versionTime".
+func VersionParams(params url.Values) (string, time.Time, error) {
+	var s string
+	switch a := params["versionId"]; len(a) {
+	case 0:
+		break
+	case 1:
+		s = a[0]
+	default:
+		return "", time.Time{}, errVersionIDDupe
+	}
+
+	switch a := params["versionTime"]; len(a) {
+	case 0:
+		return s, time.Time{}, nil
+	case 1:
+		t, err := time.Parse(time.RFC3339, a[0])
+		if err != nil {
+			return "", time.Time{}, fmt.Errorf("versionTime in DID URL: %w", err)
+		}
+		return s, t, nil
+	default:
+		return "", time.Time{}, errVersionTimeDupe
+	}
+}
+
+// SetVersionParams installs the standardised "versionId" and "versionTime". The
+// zero value on either s or t clears the respective parameter.
+func SetVersionParams(params url.Values, s string, t time.Time) {
+	if s != "" {
+		params.Set("versionId", s)
+	} else {
+		params.Del("versionId")
+	}
+
+	if !t.IsZero() {
+		// JSON production requires “normalized to UTC 00:00:00 and
+		// without sub-second decimal precision”, as per subsection
+		// 6.2.1 of the v1 specification.
+		t := t.UTC()
+		if t.Nanosecond() != 0 {
+			t = t.Round(time.Second)
+		}
+		params.Set("versionTime", t.Format(time.RFC3339))
+	} else {
+		params.Del("versionTime")
+	}
+}
+
+// EncodeWithLead returns s prefixed by lead, including percent-encoding where
+// needed.
+func encodeWithLead(s string, lead byte) string {
+	var b strings.Builder
+	b.WriteByte(lead)
+
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; c {
+		// match query or fragment BNF excluding pct-encoded
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // unreserved
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // unreserved
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', // unreserved
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // unreserved
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', // unreserved
+			'-', '.', '_', '~', // unreserved
+			'!', '$', '&', '\'', '(', ')', '*', '+', ',', ';', '=', // sub-delims
+			':', '@', // pchar
+			'/', '?': // query or fragment
+			// no escape
+			b.WriteByte(c)
+
+		default:
+			// escape
+			b.WriteByte('%')
+			b.WriteByte(hexTable[c>>4])
+			b.WriteByte(hexTable[c&15])
+		}
+	}
+
+	return b.String()
 }
 
 // HexTable maps a nibble to its encoded value.

@@ -1,7 +1,6 @@
 package did_test
 
 import (
-	"errors"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -281,7 +280,7 @@ var GoldenURLs = []struct {
 	did.URL
 }{
 	{
-		"did:example:123456789abcdefghi",
+		"did:example:123456789abcdefghi", // from example1
 		did.URL{
 			DID: did.DID{
 				Method: "example",
@@ -304,7 +303,7 @@ var GoldenURLs = []struct {
 				Method: "example",
 				SpecID: "123456",
 			},
-			Query: url.Values{"versionId": []string{"1"}},
+			RawQuery: "?versionId=1",
 		},
 	}, {
 		example4,
@@ -313,7 +312,7 @@ var GoldenURLs = []struct {
 				Method: "example",
 				SpecID: "123",
 			},
-			Fragment: "public-key-0",
+			RawFragment: "#public-key-0",
 		},
 	}, {
 		example5,
@@ -322,7 +321,7 @@ var GoldenURLs = []struct {
 				Method: "example",
 				SpecID: "123",
 			},
-			Fragment: "agent",
+			RawFragment: "#agent",
 		},
 	}, {
 		example6,
@@ -331,11 +330,8 @@ var GoldenURLs = []struct {
 				Method: "example",
 				SpecID: "123",
 			},
-			Query: url.Values{
-				"service":     []string{"agent"},
-				"relativeRef": []string{"/credentials"},
-			},
-			Fragment: "degree",
+			RawQuery:    "?service=agent&relativeRef=/credentials",
+			RawFragment: "#degree",
 		},
 	}, {
 		example7,
@@ -344,7 +340,7 @@ var GoldenURLs = []struct {
 				Method: "example",
 				SpecID: "123",
 			},
-			Query: url.Values{"versionTime": []string{"2021-05-10T17:00:00Z"}},
+			RawQuery: "?versionTime=2021-05-10T17:00:00Z",
 		},
 	}, {
 		example8,
@@ -353,9 +349,7 @@ var GoldenURLs = []struct {
 				Method: "example",
 				SpecID: "123",
 			},
-			Query: url.Values{"service": []string{"files"},
-				"relativeRef": []string{"/resume.pdf"},
-			},
+			RawQuery: "?service=files&relativeRef=/resume.pdf",
 		},
 	}, {
 		"did:foo:bar:baz",
@@ -367,25 +361,25 @@ var GoldenURLs = []struct {
 		},
 	},
 
-	{"#", did.URL{}},
-	{"?", did.URL{}},
-	{"?#", did.URL{}},
+	{"?", did.URL{RawQuery: "?"}},
+	{"#", did.URL{RawFragment: "#"}},
+	{"?#", did.URL{RawQuery: "?", RawFragment: "#"}},
 
 	{".", did.URL{RawPath: "."}},
 	{"./", did.URL{RawPath: "./"}},
 	{"./..", did.URL{RawPath: "./.."}},
 	{"./../", did.URL{RawPath: "./../"}},
 	{"./../...", did.URL{RawPath: "./../..."}},
-	{".#", did.URL{RawPath: "."}},
-	{"./#", did.URL{RawPath: "./"}},
-	{"./..#", did.URL{RawPath: "./.."}},
-	{"./../#", did.URL{RawPath: "./../"}},
-	{"./../...#", did.URL{RawPath: "./../..."}},
-	{".?", did.URL{RawPath: "."}},
-	{"./?", did.URL{RawPath: "./"}},
-	{"./..?", did.URL{RawPath: "./.."}},
-	{"./../?", did.URL{RawPath: "./../"}},
-	{"./../...?", did.URL{RawPath: "./../..."}},
+	{".#", did.URL{RawPath: ".", RawFragment: "#"}},
+	{"./#", did.URL{RawPath: "./", RawFragment: "#"}},
+	{"./..#", did.URL{RawPath: "./..", RawFragment: "#"}},
+	{"./../#", did.URL{RawPath: "./../", RawFragment: "#"}},
+	{"./../...#", did.URL{RawPath: "./../...", RawFragment: "#"}},
+	{".?", did.URL{RawPath: ".", RawQuery: "?"}},
+	{"./?", did.URL{RawPath: "./", RawQuery: "?"}},
+	{"./..?", did.URL{RawPath: "./..", RawQuery: "?"}},
+	{"./../?", did.URL{RawPath: "./../", RawQuery: "?"}},
+	{"./../...?", did.URL{RawPath: "./../...", RawQuery: "?"}},
 
 	{"did", did.URL{RawPath: "did"}},
 	{"did/", did.URL{RawPath: "did/"}},
@@ -394,8 +388,10 @@ var GoldenURLs = []struct {
 	{"/did:a/", did.URL{RawPath: "/did:a/"}},
 	{"/did:a/did", did.URL{RawPath: "/did:a/did"}},
 
-	{"?foo=bar", did.URL{Query: url.Values{"foo": []string{"bar"}}}},
-	{"#foo", did.URL{Fragment: "foo"}},
+	{"?foo=bar", did.URL{RawQuery: "?foo=bar"}},
+	{"#foo", did.URL{RawFragment: "#foo"}},
+
+	{"%BE?%DE#%AD", did.URL{RawPath: "%BE", RawQuery: "?%DE", RawFragment: "#%AD"}},
 }
 
 func TestParseURL(t *testing.T) {
@@ -406,20 +402,8 @@ func TestParseURL(t *testing.T) {
 			continue
 		}
 
-		if got.Method != gold.Method {
-			t.Errorf("DID %q got method %q, want %q", gold.S, got.Method, gold.Method)
-		}
-		if got.SpecID != gold.SpecID {
-			t.Errorf("DID %q got method-specific identifier %q, want %q", gold.S, got.SpecID, gold.SpecID)
-		}
-		if got.RawPath != gold.RawPath {
-			t.Errorf("DID %q got raw path %q, want %q", gold.S, got.RawPath, gold.RawPath)
-		}
-		if !reflect.DeepEqual(got.Query, gold.Query) {
-			t.Errorf("DID %q got params %q, want %q", gold.S, got.Query, gold.Query)
-		}
-		if got.Fragment != gold.Fragment {
-			t.Errorf("DID %q got fragment %q, want %q", gold.S, got.Fragment, gold.Fragment)
+		if *got != gold.URL {
+			t.Errorf("DID %q got %#v, want %#v", gold.S, *got, gold.URL)
 		}
 	}
 }
@@ -427,7 +411,11 @@ func TestParseURL(t *testing.T) {
 var GoldenURLErrors = []struct{ URL, Err string }{
 	{"", "empty DID string"},
 	{"did:foo:bar/%", `invalid DID "did:foo:bar/%": end incomplete`},
+	{"did:foo:bar?%", `invalid DID "did:foo:bar?%": end incomplete`},
+	{"did:foo:bar#%", `invalid DID "did:foo:bar#%": end incomplete`},
 	{"did:foo:bar/%X0", `invalid DID "did:foo:bar/%X0": illegal 'X' at byte № 14`},
+	{"did:foo:bar?%X0", `invalid DID "did:foo:bar?%X0": illegal 'X' at byte № 14`},
+	{"did:foo:bar#%X0", `invalid DID "did:foo:bar#%X0": illegal 'X' at byte № 14`},
 }
 
 func TestParseURLErrors(t *testing.T) {
@@ -459,19 +447,6 @@ func TestParseURLErrors(t *testing.T) {
 			t.Errorf("%q got error type %T (%q), want a *did.SyntaxError", gold.URL, err, err)
 		}
 	}
-
-	const URL = "did:foo:bar#%X0"
-	got, err := did.ParseURL(URL)
-	switch err.(type) {
-	case nil:
-		t.Errorf("%q got %+v, want a SyntaxError", URL, got)
-	case *did.SyntaxError:
-		if !errors.As(err, new(url.EscapeError)) {
-			t.Errorf("%q got error %#v, want a wrapped url.EscapeError", URL, err)
-		}
-	default:
-		t.Errorf("%q got error type %T (%q), want a *did.SyntaxError", URL, err, err)
-	}
 }
 
 // SelectEquals groups equivalent DID URL additions.
@@ -479,17 +454,17 @@ var SelectEquals = [][]string{
 	{
 		"/escaped%F0%9F%A4%96",
 		"/%65scaped%F0%9F%A4%96",
-		"/escap%65d%F0%9F%A4%96",
+		"/escap%65d%f0%9F%a4%96",
+	},
+	{
+		"?escaped%F0%9F%A4%96",
+		"?%65scaped%F0%9F%A4%96",
+		"?escap%65d%f0%9f%a4%96",
 	},
 	{
 		"#escaped%F0%9F%A4%96",
 		"#%65scaped%F0%9F%A4%96",
-		"#escap%65d%F0%9F%A4%96",
-	},
-	{
-		"#escaped=%F0%9F%A4%96",
-		"#%65scaped=%F0%9F%A4%96",
-		"#escap%65d=%F0%9F%A4%96",
+		"#escap%65d%f0%9f%a4%96",
 	},
 	{
 		"/%ee?%aa=%bb#%ff",
@@ -561,15 +536,18 @@ func TestURLString(t *testing.T) {
 	}
 
 	for _, gold := range GoldenURLs {
-		got := gold.URL.String()
-		if !gold.URL.IsRelative() && !gold.URL.EqualString(got) {
-			t.Errorf("%#v String got %q, want EqualString to self", gold.URL, got)
+		s := gold.URL.String()
+		u, err := did.ParseURL(s)
+		if err != nil {
+			t.Errorf("%#v String got %q, ParseURL error: %s", gold.URL, s, err)
+		} else if *u != gold.URL {
+			t.Errorf("ParseURL(%q) got %#v, want original %#v", s, u, gold.URL)
 		}
 	}
 }
 
 func FuzzURLString(f *testing.F) {
-	f.Fuzz(func(t *testing.T, method, specID, seg1, seg2 string, segN byte, fragment string) {
+	f.Fuzz(func(t *testing.T, method, specID, seg1, seg2 string, segN byte, query, fragment string) {
 		// omit invalid method names for fuzz test
 		if method == "" {
 			return
@@ -584,19 +562,23 @@ func FuzzURLString(f *testing.F) {
 			return
 		}
 
-		u := did.URL{DID: did.DID{Method: method, SpecID: specID}, Fragment: fragment}
+		u := did.URL{DID: did.DID{Method: method, SpecID: specID}}
+
 		segs := []string{seg1, seg2}
 		if int(uint(segN)) < len(segs) {
 			segs = segs[:segN]
 		}
 		u.SetPathSegments(segs...)
-		s := u.String()
 
+		u.SetQuery(query)
+		u.SetFragment(fragment)
+
+		s := u.String()
 		u2, err := did.ParseURL(s)
 		if err != nil {
 			t.Fatalf("ParseURL error on String result %q: %s", s, err)
 		}
-		if !u2.Equal(&u) {
+		if *u2 == u {
 			t.Fatalf("%#v became %#v after codec cycle with %q", u, u2, s)
 		}
 	})
@@ -731,12 +713,12 @@ func TestURLVersionParams(t *testing.T) {
 		sample := example3
 		const want = "1"
 
-		u, err := did.ParseURL(sample)
+		u, err := url.Parse(sample)
 		if err != nil {
 			t.Fatalf("%s parse error: %s", sample, err)
 		}
 
-		vID, vTime, err := u.VersionParams()
+		vID, vTime, err := did.VersionParams(u.Query())
 		if err != nil {
 			t.Fatalf("%s got error: %s", sample, err)
 		}
@@ -752,12 +734,12 @@ func TestURLVersionParams(t *testing.T) {
 		sample := example7
 		want := time.Date(2021, 05, 10, 17, 00, 00, 0, time.UTC)
 
-		u, err := did.ParseURL(sample)
+		u, err := url.Parse(sample)
 		if err != nil {
 			t.Fatalf("%s parse error: %s", sample, err)
 		}
 
-		vID, vTime, err := u.VersionParams()
+		vID, vTime, err := did.VersionParams(u.Query())
 		if err != nil {
 			t.Fatalf("%s got error: %s", sample, err)
 		}
