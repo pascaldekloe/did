@@ -86,11 +86,85 @@ func Parse(s string) (DID, error) {
 	if err != nil {
 		return DID{}, err
 	}
-	specID, end := parseSpecID(s, len(prefix)+len(method)+1)
-	if end < len(s) || specID == "" {
-		return DID{}, &SyntaxError{S: s, I: end}
+	specIDStart := len(prefix) + len(method) + 1
+
+	i := specIDStart
+	if i >= len(s) {
+		return DID{}, &SyntaxError{S: s, I: i}
 	}
-	return DID{Method: method, SpecID: specID}, nil
+
+	// read method-specific identifier
+NoEscapes:
+	for {
+		if i >= len(s) {
+			return DID{Method: method, SpecID: s[specIDStart:]}, nil
+		}
+
+		switch s[i] {
+		case ':': // method-specific-id must match: *( *idchar ":" ) 1*idchar
+			if i == len(s)-1 {
+				return DID{}, &SyntaxError{S: s, I: i}
+			}
+
+			fallthrough
+		// match idchar BNF excluding pct-encoded
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // DIGIT
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // ALPHA
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', // ALPHA
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // ALPHA
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', // ALPHA
+			'.', '-', '_': // idchar
+			i++ // pass
+
+		case '%':
+			break NoEscapes
+
+		default:
+			// illegal character
+			return DID{}, &SyntaxError{S: s, I: i}
+		}
+	}
+
+	var b strings.Builder
+	// every 3-byte escape produces 1 byte
+	b.Grow(len(s) - specIDStart)
+	b.WriteString(s[specIDStart:i])
+
+	// parse method-specific identifier escapes
+	for i < len(s) {
+		switch s[i] {
+		case ':': // method-specific-id must match: *( *idchar ":" ) 1*idchar
+			if i == len(s)-1 {
+				return DID{}, &SyntaxError{S: s, I: i}
+			}
+
+			fallthrough
+		// match idchar BNF excluding pct-encoded
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // DIGIT
+			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // ALPHA
+			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', // ALPHA
+			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // ALPHA
+			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', // ALPHA
+			'.', '-', '_': // idchar
+			b.WriteByte(s[i])
+			i++
+
+		// match pct-encoded BNF
+		case '%':
+			v, err := parseHex(s, i+1)
+			if err != nil {
+				return DID{}, err
+			}
+			b.WriteByte(v)
+			i += 3
+
+		default:
+			// illegal character
+			return DID{}, &SyntaxError{S: s, I: i}
+		}
+	}
+
+	return DID{Method: method, SpecID: b.String()}, nil
 }
 
 func readMethodName(s string) (string, error) {
@@ -116,85 +190,6 @@ func readMethodName(s string) (string, error) {
 	}
 	// separator ':' not found
 	return "", &SyntaxError{S: s, I: len(s)}
-}
-
-// ParseSpecID reads s[offset:], and returns the method-specific identifier fully escaped.
-func parseSpecID(s string, offset int) (specID string, end int) {
-	i := offset
-	if i >= len(s) {
-		return "", i
-	}
-
-NoEscapes:
-	for {
-		if i >= len(s) {
-			// must match: *( *idchar ":" ) 1*idchar
-			if end := len(s) - 1; s[end] == ':' {
-				return s[offset:end], end
-			}
-			return s[offset:], len(s)
-		}
-
-		switch s[i] {
-		// match method-specific-id BNF
-		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', // DIGIT
-			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', // ALPHA
-			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', // ALPHA
-			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', // ALPHA
-			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', // ALPHA
-			'.', '-', '_', // idchar
-			':': // method-specific-id
-			// colon not allowed as last character check delayed
-			i++ // pass
-
-		case '%':
-			break NoEscapes
-
-		default:
-			// illegal character
-			return s[offset:i], i
-		}
-	}
-
-	var b strings.Builder
-	// every 3-byte escape produces 1 byte
-	b.Grow(len(s) - offset)
-	b.WriteString(s[offset:i])
-
-	for i < len(s) {
-		switch s[i] {
-		// match method-specific-id BNF
-		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-			'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-			'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-			'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-			'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-			'.', '-', '_',
-			':':
-			// colon not allowed as last character check delayed
-			b.WriteByte(s[i])
-			i++
-
-		case '%':
-			v, err := parseHex(s, i+1)
-			if err != nil {
-				return "", err.(*SyntaxError).I
-			}
-			b.WriteByte(v)
-			i += 3
-
-		default:
-			// illegal character
-			return b.String(), i
-		}
-	}
-
-	specID = b.String()
-	// must match: *( *idchar ":" ) 1*idchar
-	if end := len(s) - 1; s[end] != ':' {
-		return specID, len(s)
-	}
-	return specID[:len(specID)-1], len(s) - 1
 }
 
 // Equal returns whether both d and o are valid, and whether they are equivalent
@@ -381,30 +376,24 @@ func ParseURL(s string) (*URL, error) {
 	if s == "" {
 		return nil, &SyntaxError{}
 	}
-	var u URL // result
 	var i int // s index
+	var u URL // result
 
 	// scheme match
 	if len(s) >= len(prefix) && s[:len(prefix)] == prefix {
-		method, err := readMethodName(s)
+		i = strings.IndexAny(s, "/?#")
+		if i < 0 {
+			d, err := Parse(s)
+			if err != nil {
+				return nil, err
+			}
+			return &URL{DID: d}, nil
+		}
+		d, err := Parse(s[:i])
 		if err != nil {
 			return nil, err
 		}
-		specID, end := parseSpecID(s, len(prefix)+len(method)+1)
-		if specID == "" {
-			return nil, &SyntaxError{S: s, I: end}
-		}
-		u.DID = DID{Method: method, SpecID: specID}
-
-		if end >= len(s) {
-			return &u, nil
-		}
-		switch s[end] {
-		case '/', '?', '#':
-			i = end
-		default:
-			return nil, &SyntaxError{S: s, I: end}
-		}
+		u.DID = d
 	} else {
 		// Relative references need an additional check. “A path segment
 		// that contains a colon character (e.g., "this:that") cannot be
