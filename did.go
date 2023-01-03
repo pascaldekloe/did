@@ -901,16 +901,16 @@ func (u *URL) SetPathSegments(segs ...string) {
 	u.RawPath = b.String()
 }
 
-// Fragment returns the encoded value from RawQuery, if any. Decoding is on
+// Query returns the encoded value from RawQuery, if any. Decoding is on
 // best-effort basis. Malformed percent-encodings simply pass as is.
 //
 // None of the applicable standards put any constraints on the byte-content. The
 // return may or may not be a valid UTF-8 string.
 func (u *URL) Query() string {
-	if u.RawFragment == "" || u.RawFragment[0] != '#' {
+	if u.RawQuery == "" || u.RawQuery[0] != '?' {
 		return ""
 	}
-	return bestEffortDecode(u.RawFragment[1:])
+	return bestEffortDecode(u.RawQuery[1:])
 }
 
 // SetQuery sets RawQuery to contain a normalized encoding of s.
