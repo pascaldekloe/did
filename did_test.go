@@ -713,34 +713,39 @@ func TestURLVersionParams(t *testing.T) {
 func FuzzParseURL(f *testing.F) {
 	f.Add("did:a:b/c?d#e")
 	f.Fuzz(func(t *testing.T, s string) {
-		_, err := did.Parse(s)
-		switch e := err.(type) {
+		_, parseErr := did.Parse(s)
+		switch e := parseErr.(type) {
 		case nil:
 			break // OK
 		case *did.SyntaxError:
 			if e.S != s {
 				t.Errorf("Parse(%q) got SyntaxError.S %q", s, e.S)
 			}
-			if !utf8.ValidString(err.Error()) {
-				t.Errorf("Parse(%q) error %q contains invalid UTF-8", s, err)
+			if !utf8.ValidString(parseErr.Error()) {
+				t.Errorf("Parse(%q) error %q contains invalid UTF-8", s, parseErr)
 			}
 		default:
-			t.Errorf("Parse(%q) got error type %T (%q), want a *did.SyntaxError", s, err, err)
+			t.Errorf("Parse(%q) got error type %T (%q), want a *did.SyntaxError", s, parseErr, parseErr)
 		}
 
-		_, err = did.ParseURL(s)
-		switch e := err.(type) {
+		_, parseURLErr := did.ParseURL(s)
+		switch e := parseURLErr.(type) {
 		case nil:
-			break // OK
+			if parseURLErr != nil {
+				t.Errorf("ParseURL(%q) got no error, while Parse got error: %s", s, parseErr)
+			}
 		case *did.SyntaxError:
 			if e.S != s {
 				t.Errorf("ParseURL(%q) got SyntaxError.S %q", s, e.S)
 			}
-			if !utf8.ValidString(err.Error()) {
-				t.Errorf("ParseURL(%q) error %q contains invalid UTF-8", s, err)
+			if !utf8.ValidString(parseURLErr.Error()) {
+				t.Errorf("ParseURL(%q) error %q contains invalid UTF-8", s, parseURLErr)
+			}
+			if parseErr == nil {
+				t.Errorf("ParseURL(%q) got error %q, while Parse got no error", s, parseURLErr)
 			}
 		default:
-			t.Errorf("ParseURL(%q) got error type %T (%q), want a *did.SyntaxError", s, err, err)
+			t.Errorf("ParseURL(%q) got error type %T (%q), want a *did.SyntaxError", s, parseURLErr, parseURLErr)
 		}
 	})
 }
