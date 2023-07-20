@@ -801,54 +801,16 @@ func (u *URL) PathWithEscape(escape byte) string {
 
 	for i < len(s) {
 		switch s[i] {
-		default:
-			b.WriteByte(s[i])
-			i++
-		case escape:
-			b.WriteByte(escape)
-			b.WriteByte(escape)
-			i++
 		case '%':
-			if i+2 >= len(s) {
-				// incomplete percent-encoding
+			c, err := parseHex(s, i+1)
+			if err != nil {
 				b.WriteByte(s[i])
-				i++
-				continue
+				break
 			}
 
-			var v byte
-
-			// decode first nibble
-			switch c := s[i+1]; c {
-			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-				v = (c - '0') << 4
-			case 'A', 'B', 'C', 'D', 'E', 'F':
-				v = (c - 'A' + 10) << 4
+			switch c {
 			default:
-				// illegal character
-				b.WriteByte(s[i])
-				i++
-				continue
-			}
-
-			// decode second nibble
-			switch c := s[i+2]; c {
-			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-				v |= c - '0'
-			case 'A', 'B', 'C', 'D', 'E', 'F':
-				v |= c - 'A' + 10
-			default:
-				// illegal character
-				b.WriteByte(s[i])
-				i++
-				b.WriteByte(s[i])
-				i++
-				continue
-			}
-
-			switch v {
-			default:
-				b.WriteByte(v)
+				b.WriteByte(c)
 			case escape:
 				b.WriteByte(escape)
 				b.WriteByte(escape)
@@ -856,9 +818,15 @@ func (u *URL) PathWithEscape(escape byte) string {
 				b.WriteByte(escape)
 				b.WriteByte('/')
 			}
-
 			i += 3
+			continue
+		case escape:
+			b.WriteByte(escape)
+			b.WriteByte(escape)
+		default:
+			b.WriteByte(s[i])
 		}
+		i++
 	}
 
 	return b.String()
