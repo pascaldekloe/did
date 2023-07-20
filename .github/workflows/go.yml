@@ -24,5 +24,8 @@ jobs:
     - name: Build
       run: go build -v ./...
 
+# HTTP lookup fails on GitHub and the -skip flag is broken for examples now.
+# https://github.com/golang/go/issues/61482
+# Omit package didweb entirely until any one of the preceding issues got fixed.
     - name: Test
-      run: go test -v ./...
+      run: go test -skip didweb -v ./...
