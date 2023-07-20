@@ -212,7 +212,7 @@ func ExampleVerificationMethod_jSON() {
 	}
 
 	if l := len(doc.VerificationMethods); l != 2 {
-		fmt.Println("verifacition method count:", l)
+		fmt.Println("verification method count:", l)
 		return
 	}
 	method0 := doc.VerificationMethods[0]

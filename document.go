@@ -460,7 +460,7 @@ func (srv *Service) UnmarshalJSON(bytes []byte) error {
 		}
 		p, err := url.Parse(s)
 		if err != nil {
-			var wrap *url.Error // not usefull
+			var wrap *url.Error // not useful
 			if errors.As(err, &wrap) {
 				err = wrap.Err // trim
 			}
@@ -569,7 +569,7 @@ func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
 		}
 		u, err := url.Parse(s)
 		if err != nil {
-			var wrap *url.Error // not usefull
+			var wrap *url.Error // not useful
 			if errors.As(err, &wrap) {
 				err = wrap.Err // trim
 			}
@@ -612,7 +612,7 @@ func (e *ServiceEndpoint) UnmarshalJSON(bytes []byte) error {
 			}
 			u, err := url.Parse(s)
 			if err != nil {
-				var wrap *url.Error // not usefull
+				var wrap *url.Error // not useful
 				if errors.As(err, &wrap) {
 					err = wrap.Err // trim
 				}

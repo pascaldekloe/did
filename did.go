@@ -28,7 +28,7 @@ type DID struct {
 	Method string
 
 	// The method-specific identifier must contain one or more characters.
-	// None of the applicable standards put any constaints on the byte-
+	// None of the applicable standards put any constraints on the byte-
 	// content. The field may or may not be a valid UTF-8 string.
 	SpecID string
 }
@@ -934,7 +934,7 @@ func (u *URL) Query() string {
 
 // SetQuery sets RawQuery to contain a normalized encoding of s.
 //
-// None of the applicable standards put any constaints on the byte-content. S
+// None of the applicable standards put any constraints on the byte-content. S
 // may or may not be a valid UTF-8 string.
 func (u *URL) SetQuery(s string) {
 	u.RawQuery = encodeWithLead(s, '?')
@@ -954,7 +954,7 @@ func (u *URL) Fragment() string {
 
 // SetFragment sets RawFragment to contain a normalized encoding of s.
 //
-// None of the applicable standards put any constaints on the byte-content. S
+// None of the applicable standards put any constraints on the byte-content. S
 // may or may not be a valid UTF-8 string.
 func (u *URL) SetFragment(s string) {
 	u.RawFragment = encodeWithLead(s, '#')
