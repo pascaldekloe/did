@@ -674,8 +674,6 @@ func escapedWithLeadEqual(a, b string, lead byte) bool {
 			return false // payload mismatch
 		}
 	}
-
-	return true // all compared equal
 }
 
 // PathEqual returns whether a and b represent the same path when normalized.
@@ -763,8 +761,6 @@ func pathEqual(a, b string) bool {
 			return false // path mismatch
 		}
 	}
-
-	return true // all compared equal
 }
 
 // String returns either the DID URL, or the empty string when zero. Any and
