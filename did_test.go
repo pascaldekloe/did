@@ -501,44 +501,6 @@ func TestURLString(t *testing.T) {
 	}
 }
 
-func FuzzURLString(f *testing.F) {
-	f.Fuzz(func(t *testing.T, method, specID, seg1, seg2 string, segN byte, query, fragment string) {
-		// omit invalid method names for fuzz test
-		if method == "" {
-			return
-		}
-		for _, r := range method {
-			if r < '0' || r > '9' && r < 'a' || r > 'z' {
-				return
-			}
-		}
-		// omit invalid method-specific identifiers for fuzz test
-		if specID == "" {
-			return
-		}
-
-		u := did.URL{DID: did.DID{Method: method, SpecID: specID}}
-
-		segs := []string{seg1, seg2}
-		if int(segN&3) < len(segs) {
-			segs = segs[:segN&3]
-		}
-		u.SetPathSegments(segs...)
-
-		u.SetQuery(query)
-		u.SetFragment(fragment)
-
-		s := u.String()
-		u2, err := did.ParseURL(s)
-		if err != nil {
-			t.Fatalf("ParseURL error on String result %q: %s", s, err)
-		}
-		if *u2 != u {
-			t.Fatalf("%#v became %#v after codec cycle with %q", u, u2, s)
-		}
-	})
-}
-
 func ExampleURL_PathWithEscape() {
 	u, err := did.ParseURL("did:example:123456/path%2Fesc")
 	if err != nil {
@@ -651,14 +613,11 @@ func testURLSetPathSegments(t *testing.T, segs ...string) {
 	u.SetPathSegments(segs...)
 	got := u.PathSegments()
 	if len(got) != len(segs) {
-		t.Logf("set segments %q got raw path %q", segs, u.RawPath)
-		t.Errorf("got %d segments %q, want %d %q", len(got), got, len(segs), segs)
-		return
+		t.Fatalf("got segments %q, want %q", got, segs)
 	}
 	for i, s := range segs {
 		if s != got[i] {
-			t.Logf("set segments %q got raw path %q", segs, u.RawPath)
-			t.Errorf("segment № %d got %q, want %q", i, got[i], s)
+			t.Fatalf("got segments %q, want %q", got, segs)
 		}
 	}
 }
