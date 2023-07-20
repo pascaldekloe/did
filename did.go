@@ -213,8 +213,8 @@ func (d DID) Equal(o DID) bool {
 	return o == d
 }
 
-// EqualString returns whether whether s conforms to the DID syntax, and whether
-// the reference is equivalent according to DID Equal.
+// EqualString returns whether s conforms to the DID syntax, and whether the
+// reference is equivalent according to DID Equal.
 func (d DID) EqualString(s string) bool {
 	// scheme compare
 	if len(s) < len(prefix) || s[:len(prefix)] != prefix {
@@ -267,6 +267,14 @@ func (d DID) EqualString(s string) bool {
 		}
 	}
 	return i >= len(s) // compared all
+}
+
+// Equal returns whether both s1 and s2 conform to the DID syntax, and whether
+// they are equivalent according to the “Normalization and Comparison” rules of
+// RFC 3986, section 6.
+func Equal(s1, s2 string) bool {
+	d1, err := Parse(s1)
+	return err == nil && d1.EqualString(s2)
 }
 
 // String returns either the URL, or the empty string when zero. Any and all
@@ -543,7 +551,7 @@ func (u *URL) IsRelative() bool { return u.Method == "" && u.SpecID == "" }
 
 // Equal returns whether both u and o are valid, and whether they are equivalent
 // according to the “Normalization and Comparison” rules of RFC 3986, section 6.
-// Path evaluation follows the logic of path.Clean. Query eqvaluetion compares
+// Path evaluation follows the logic of path.Clean. Query evaluation compares
 // the escaped content byte-for-byte. See the bugs section for details.
 //
 // Relative URLs do not compare equal as a safety precaution. “In testing for
@@ -566,6 +574,21 @@ func (u *URL) Equal(o *URL) bool {
 func (u *URL) EqualString(s string) bool {
 	o, err := ParseURL(s)
 	return err == nil && u.Equal(o)
+}
+
+// URLEqual returns whether both s1 and s2 conform to the DID URL syntax, and
+// whether they are equivalent according to the “Normalization and Comparison”
+// rules of RFC 3986, section 6.
+// Path evaluation follows the logic of path.Clean. Query evaluation compares
+// the escaped content byte-for-byte. See the bugs section for details.
+//
+// Relative URLs do not compare equal as a safety precaution. “In testing for
+// equivalence, applications should not directly compare relative references;
+// the references should be converted to their respective target URIs before
+// comparison.” as per “URI Generic Syntax” RFC 3986, subsection 6.1.
+func URLEqual(s1, s2 string) bool {
+	u1, err := ParseURL(s1)
+	return err == nil && u1.EqualString(s2)
 }
 
 // EscapedWithLeadEqual returns whether a and b both have lead as the first
